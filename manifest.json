@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "WTYT — Watch The YouTube Things",
+  "version": "0.3.3",
+  "description": "A watch / read / skip verdict on YouTube videos, on your home feed, video pages, and playlists. Bring your own Claude (paid) or Groq (free) API key.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://api.groq.com/*"
+  ],
+  "background": { "service_worker": "src/background.js" },
+  "action": { "default_title": "WTYT settings" },
+  "options_page": "src/options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["src/yt-data.js", "src/icons.js", "src/cards.js", "src/content.js"],
+      "css": ["src/styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

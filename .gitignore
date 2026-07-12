@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# tooling / build
+node_modules/
+*.zip
+*.crx
+*.pem
+
+# local versioning snapshots (git is the source of history)
+_versions/

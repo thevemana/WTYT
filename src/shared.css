@@ -1,0 +1,49 @@
+/* WTYT — shared design tokens for the extension's own pages (options, welcome).
+   Injected content-script card styles live separately in styles.css. */
+
+:root {
+  color-scheme: light dark;
+  --wtyt-accent: #c4302b;
+  --wtyt-accent-wash: rgba(196, 48, 43, 0.07);
+  --wtyt-good: #2ba640;
+  --wtyt-bad: #c4302b;
+  --wtyt-ink: #0f0f0f;
+  --wtyt-ink-2: #606060;
+  --wtyt-bg: #ffffff;
+  --wtyt-surface: #ffffff;
+  --wtyt-layer: rgba(0, 0, 0, 0.04);
+  --wtyt-border: rgba(0, 0, 0, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --wtyt-accent-wash: rgba(196, 48, 43, 0.16);
+    --wtyt-ink: #f1f1f1;
+    --wtyt-ink-2: #aaaaaa;
+    --wtyt-bg: #0f0f0f;
+    --wtyt-surface: #1c1c1c;
+    --wtyt-layer: rgba(255, 255, 255, 0.06);
+    --wtyt-border: rgba(255, 255, 255, 0.16);
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  font-family: 'Roboto', system-ui, Arial, sans-serif;
+  color: var(--wtyt-ink);
+  background: var(--wtyt-bg);
+  line-height: 1.5;
+  margin: 0;
+}
+
+button { font-family: inherit; cursor: pointer; }
+.btn-primary {
+  padding: 9px 20px; border: none; border-radius: 999px;
+  background: var(--wtyt-accent); color: #fff; font-size: 14px; font-weight: 600;
+}
+.btn-primary:hover { background: #a52824; }
+.btn-primary:disabled { background: var(--wtyt-ink-2); cursor: default; }
+.btn-ghost {
+  padding: 9px 14px; border: 1px solid var(--wtyt-border); border-radius: 999px;
+  background: transparent; color: var(--wtyt-ink); font-size: 13px; font-weight: 500;
+}
+.btn-ghost:hover { border-color: var(--wtyt-ink-2); }

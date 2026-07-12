@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WTYT settings</title>
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    body {
+      max-width: 620px;
+      margin: 40px auto;
+      padding: 0 20px 60px;
+    }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { color: var(--wtyt-ink-2); margin: 0 0 28px; font-size: 14px; }
+    section { margin-bottom: 32px; }
+    section > h2 {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--wtyt-ink-2);
+      margin: 0 0 12px;
+    }
+    label.field-label { display: block; font-weight: 600; margin: 0 0 4px; font-size: 14px; }
+    .hint { font-size: 12px; color: var(--wtyt-ink-2); margin-top: 4px; }
+    .checkline { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    .checkline input { width: auto; }
+    .key-row { display: flex; gap: 8px; }
+    .key-row input { flex: 1; }
+    input[type="password"], input[type="text"], input[type="number"] {
+      padding: 9px 11px;
+      font-size: 14px;
+      border: 1px solid var(--wtyt-border);
+      border-radius: 8px;
+      box-sizing: border-box;
+      background: var(--wtyt-surface);
+      color: var(--wtyt-ink);
+      width: 100%;
+    }
+    /* Provider + model cards share the selectable-card look. */
+    .provider-cards, .model-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 520px) { .provider-cards, .model-cards { grid-template-columns: 1fr; } }
+    .provider-card, .model-card {
+      border: 1.5px solid var(--wtyt-border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .provider-card:hover, .model-card:hover { border-color: var(--wtyt-ink-2); }
+    .provider-card.selected, .model-card.selected { border-color: var(--wtyt-accent); background: var(--wtyt-accent-wash); }
+    .provider-card input, .model-card input { position: absolute; opacity: 0; pointer-events: none; }
+    .provider-card .name, .model-card .name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .provider-card .desc { font-size: 12.5px; margin-top: 6px; color: var(--wtyt-ink-2); }
+    .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+      padding: 1px 6px; border-radius: 999px; background: var(--wtyt-accent); color: #fff;
+    }
+    .tag.free { background: #2ba640; }
+    .tag.neutral { background: var(--wtyt-ink-2); }
+    .model-card .best { font-size: 13px; margin: 6px 0 10px; color: var(--wtyt-ink); }
+    .model-card dl { margin: 0; font-size: 12px; color: var(--wtyt-ink-2); }
+    .model-card dl div { display: flex; justify-content: space-between; padding: 2px 0; }
+    .model-card dt { color: var(--wtyt-ink-2); }
+    .model-card dd { margin: 0; font-weight: 600; color: var(--wtyt-ink); }
+    .cost-note {
+      font-size: 12px; color: var(--wtyt-ink-2); margin-top: 10px;
+      background: var(--wtyt-layer); border-radius: 8px; padding: 8px 10px;
+    }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
+    .actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+    #status { font-size: 13px; min-height: 18px; }
+    #status.ok { color: var(--wtyt-good); }
+    #status.err { color: var(--wtyt-bad); }
+    a { color: var(--wtyt-accent); }
+  </style>
+</head>
+<body>
+  <h1>WTYT · Watch The YouTube Things</h1>
+  <p class="sub">Adds a watch / read / skip verdict to videos on your home feed, video pages, and playlists. Your key and settings stay in this browser.</p>
+
+  <section>
+    <h2>AI provider</h2>
+    <div class="provider-cards">
+      <label class="provider-card" data-provider="anthropic">
+        <input type="radio" name="provider" value="anthropic" />
+        <div class="name">Claude · Anthropic</div>
+        <div class="desc">Best judgment. Pay-as-you-go API. Note a Claude.ai subscription does <strong>not</strong> include API access.</div>
+      </label>
+      <label class="provider-card" data-provider="groq">
+        <input type="radio" name="provider" value="groq" />
+        <div class="name">Groq <span class="tag free">FREE</span></div>
+        <div class="desc">Free tier, no credit card. Runs GPT-OSS 120B and Llama — fast enough to score a feed. The easiest way to try WTYT.</div>
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="keyHeading">API key</h2>
+    <label class="field-label" for="apiKey">Your key</label>
+    <div class="key-row">
+      <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+      <button id="toggleKey" class="btn-ghost" type="button">Show</button>
+      <button id="testKey" class="btn-ghost" type="button">Test</button>
+    </div>
+    <div class="hint" id="keyHint"></div>
+  </section>
+
+  <section>
+    <h2>Model · quality vs. cost</h2>
+    <div class="model-cards" id="modelCards"></div>
+    <div class="cost-note" id="costNote"></div>
+  </section>
+
+  <section>
+    <h2>Automatic analysis</h2>
+    <label class="checkline"><input type="checkbox" id="autoAnalyze" /> <span>Score videos automatically</span></label>
+    <div class="hint">On: video pages score on open, and the home feed scores as you scroll (in batches). Off: nothing runs until you click the WTYT button. Playlists are always button-triggered.</div>
+    <div style="margin-top:14px">
+      <label class="field-label" for="homeBatch">Home-feed batch size</label>
+      <input type="number" id="homeBatch" min="1" max="100" style="max-width:160px" />
+      <div class="hint">Videos auto-scored per batch on the home feed before the Continue button appears. Cached videos are free and do not count.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Run limits</h2>
+    <div class="row2">
+      <div>
+        <label class="field-label" for="maxVideos">Max videos per run</label>
+        <input type="number" id="maxVideos" min="1" max="100" />
+        <div class="hint">Top of the playlist down.</div>
+      </div>
+      <div>
+        <label class="field-label" for="commentViewThreshold">Comment cross-check threshold</label>
+        <input type="number" id="commentViewThreshold" min="0" step="10000" />
+        <div class="hint">Videos at/above this view count get their top comments pulled to double-check the ratings.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button id="save" class="btn-primary" type="button">Save</button>
+    <button id="clearCache" class="btn-ghost" type="button">Clear cached analyses</button>
+    <span id="status"></span>
+  </div>
+
+  <script src="models.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

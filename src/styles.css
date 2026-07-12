@@ -1,0 +1,251 @@
+/* WTYT injected styles.
+   YouTube's new page framework no longer exposes the old --yt-spec-* variables
+   (verified live 2026-07), so the cards carry their own palette and switch on
+   html[dark] — the attribute YouTube still sets for its dark theme. Values match
+   YouTube's actual dark/light text colors (#f1f1f1 / #0f0f0f, #aaa / #606060). */
+
+.wtyt-card {
+  --wtyt-text: #0f0f0f;
+  --wtyt-text-2: #606060;
+  --wtyt-layer: rgba(0, 0, 0, 0.05);
+  --wtyt-layer-2: rgba(0, 0, 0, 0.1);
+  --wtyt-border: rgba(0, 0, 0, 0.12);
+}
+html[dark] .wtyt-card {
+  --wtyt-text: #f1f1f1;
+  --wtyt-text-2: #aaaaaa;
+  --wtyt-layer: rgba(255, 255, 255, 0.07);
+  --wtyt-layer-2: rgba(255, 255, 255, 0.14);
+  --wtyt-border: rgba(255, 255, 255, 0.16);
+}
+
+.wtyt-card {
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--wtyt-layer);
+  border: 1px solid var(--wtyt-border);
+  color: var(--wtyt-text);
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  max-width: 720px;
+}
+
+.wtyt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wtyt-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.wtyt-ic { flex: none; vertical-align: middle; }
+.wtyt-verdict-watch { background: #2ba640; }
+.wtyt-verdict-read { background: #3170c7; }
+.wtyt-verdict-skip { background: #7d7d7d; }
+
+.wtyt-oneliner { color: var(--wtyt-text); }
+
+.wtyt-scores {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.wtyt-score { display: inline-flex; align-items: center; gap: 6px; }
+.wtyt-score-label { color: var(--wtyt-text-2); font-size: 1.1rem; }
+.wtyt-score-bar {
+  width: 56px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--wtyt-layer-2);
+  overflow: hidden;
+  display: inline-block;
+}
+.wtyt-score-fill { display: block; height: 100%; border-radius: 3px; }
+.wtyt-fill-good { background: #2ba640; }
+.wtyt-fill-mid { background: #d9a521; }
+.wtyt-fill-bad { background: #c4302b; }
+.wtyt-score-num { font-weight: 600; font-size: 1.1rem; min-width: 2ch; color: var(--wtyt-text); }
+
+.wtyt-community {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 1.1rem;
+  color: var(--wtyt-text-2);
+}
+.wtyt-community-icon { font-weight: 700; }
+.wtyt-community-ok .wtyt-community-icon { color: #2ba640; }
+.wtyt-community-warn .wtyt-community-icon { color: #d9a521; }
+
+.wtyt-details { margin-top: 8px; }
+.wtyt-summary {
+  cursor: pointer;
+  color: var(--wtyt-text-2);
+  font-weight: 500;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+.wtyt-summary::-webkit-details-marker { display: none; }
+.wtyt-summary-chevron { transform: rotate(-90deg); transition: transform 0.15s ease; color: var(--wtyt-text-2); }
+details[open] > .wtyt-summary .wtyt-summary-chevron { transform: rotate(0deg); }
+.wtyt-takeaways { margin: 6px 0 0 18px; padding: 0; }
+.wtyt-takeaways li { margin-bottom: 3px; }
+.wtyt-read-instead {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid #3170c7;
+  background: var(--wtyt-layer);
+  border-radius: 0 8px 8px 0;
+}
+.wtyt-note { margin: 6px 0 0; font-size: 1rem; color: var(--wtyt-text-2); }
+
+.wtyt-transcript-body {
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: var(--wtyt-layer);
+  border-radius: 8px;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--wtyt-text-2);
+  white-space: pre-wrap;
+}
+
+.wtyt-pending { display: flex; align-items: center; gap: 8px; color: var(--wtyt-text-2); }
+.wtyt-error { color: #c4302b; }
+
+.wtyt-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--wtyt-layer-2);
+  border-top-color: var(--wtyt-text-2);
+  border-radius: 50%;
+  display: inline-block;
+  animation: wtyt-spin 0.8s linear infinite;
+}
+@keyframes wtyt-spin { to { transform: rotate(360deg); } }
+
+/* Floating action button — deliberately not injected into YouTube's header DOM,
+   so no existing layout shifts. Anchored top-right (v2): bottom-right collided with
+   YouTube's miniplayer / scroll-to-top, and the top is where a playlist action reads
+   as belonging. `top` clears YouTube's ~56px masthead. */
+.wtyt-fab {
+  position: fixed;
+  right: 24px;
+  top: 70px;
+  z-index: 9999;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #c4302b;
+  color: #fff;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.wtyt-fab:hover { background: #a52824; }
+.wtyt-fab:disabled { background: #7d7d7d; cursor: default; }
+
+.wtyt-fab-pulse { animation: wtyt-pulse 1.6s ease-out 3; }
+@keyframes wtyt-pulse {
+  0% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(196, 48, 43, 0.5); }
+  70% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 14px rgba(196, 48, 43, 0); }
+  100% { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(196, 48, 43, 0); }
+}
+
+/* ---------- Home feed (H3): verdict pill on thumbnail + score row under image ---------- */
+.wtyt-image-host { position: relative; }
+.wtyt-pill-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.wtyt-scorerow {
+  /* Own tokens: this row is injected into YouTube's metadata, NOT inside .wtyt-card,
+     so it can't inherit the card's --wtyt-text. Without these the numbers were
+     black-on-black in dark mode. */
+  --wtyt-text: #0f0f0f;
+  --wtyt-text-2: #606060;
+  display: flex;
+  gap: 16px;
+  /* Hug the thumbnail above, breathe before the title below (was cramped to title). */
+  margin: -6px 0 8px;
+  padding: 2px 0 0;
+  cursor: pointer;
+  color: var(--wtyt-text);
+  font-family: 'Roboto', Arial, sans-serif;
+}
+html[dark] .wtyt-scorerow { --wtyt-text: #f1f1f1; --wtyt-text-2: #aaaaaa; }
+.wtyt-chip { display: inline-flex; align-items: center; gap: 5px; }
+.wtyt-chip-num { font-size: 1.3rem; font-weight: 600; color: var(--wtyt-text); }
+.wtyt-ic-good { color: #2ba640; }
+.wtyt-ic-mid { color: #d9a521; }
+.wtyt-ic-bad { color: #c4302b; }
+.wtyt-home-expand { margin-top: 8px; }
+
+/* ---------- Watch rail: expansive panel ---------- */
+.wtyt-card.wtyt-watch { max-width: none; margin: 0 0 12px; }
+.wtyt-brand {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--wtyt-text-2);
+}
+.wtyt-brand .wtyt-ic { color: #c4302b; }
+.wtyt-inline-btn {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #c4302b;
+  color: #fff;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wtyt-inline-btn:hover { background: #a52824; }
+
+.wtyt-toast {
+  position: fixed;
+  right: 24px;
+  top: 124px;
+  z-index: 9999;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(20, 20, 20, 0.92);
+  color: #fff;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 1.2rem;
+  line-height: 1.45;
+}
