@@ -13,12 +13,32 @@
     h1 { font-size: 20px; margin-bottom: 4px; }
     .sub { color: var(--wtyt-ink-2); margin: 0 0 28px; font-size: 14px; }
     section { margin-bottom: 32px; }
-    section > h2 {
+    section > h2, section > h3 {
       font-size: 12px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--wtyt-ink-2);
+      font-weight: 600;
       margin: 0 0 12px;
+    }
+    /* "API key" / "Model" sub-headings — one level below the provider h3. */
+    section > h4 {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--wtyt-ink-2);
+      font-weight: 600;
+      margin: 24px 0 10px;
+    }
+    /* A heading nested inside a <summary> (API key, collapsible) inherits the
+       summary's own eyebrow styling rather than rendering as a second, bigger label. */
+    details.adv > summary h3, details.adv > summary h4 {
+      display: inline;
+      margin: 0;
+      font: inherit;
+      color: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
     }
     label.field-label { display: block; font-weight: 600; margin: 0 0 4px; font-size: 14px; }
     .hint { font-size: 12px; color: var(--wtyt-ink-2); margin-top: 4px; }
@@ -36,17 +56,20 @@
       color: var(--wtyt-ink);
       width: 100%;
     }
-    /* Provider + model cards share the selectable-card look. */
-    .provider-cards, .model-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 520px) { .provider-cards, .model-cards { grid-template-columns: 1fr; } }
+    /* Provider cards: 2-up grid. Model tiles: compact horizontal rows (see below). */
+    .provider-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 520px) { .provider-cards { grid-template-columns: 1fr; } }
+    /* Model tiles: 2-across grid (there's room for it), collapsing to 1 on narrow widths. */
+    .model-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    @media (max-width: 520px) { .model-cards { grid-template-columns: 1fr; } }
     .provider-card, .model-card {
       border: 1.5px solid var(--wtyt-border);
       border-radius: 12px;
-      padding: 14px;
       cursor: pointer;
       position: relative;
       transition: border-color 0.15s, background 0.15s;
     }
+    .provider-card { padding: 14px; }
     .provider-card:hover, .model-card:hover { border-color: var(--wtyt-ink-2); }
     .provider-card.selected, .model-card.selected { border-color: var(--wtyt-accent); background: var(--wtyt-accent-wash); }
     .provider-card input, .model-card input { position: absolute; opacity: 0; pointer-events: none; }
@@ -58,11 +81,11 @@
     }
     .tag.free { background: #2ba640; }
     .tag.neutral { background: var(--wtyt-ink-2); }
-    .model-card .best { font-size: 13px; margin: 6px 0 10px; color: var(--wtyt-ink); }
-    .model-card dl { margin: 0; font-size: 12px; color: var(--wtyt-ink-2); }
-    .model-card dl div { display: flex; justify-content: space-between; padding: 2px 0; }
-    .model-card dt { color: var(--wtyt-ink-2); }
-    .model-card dd { margin: 0; font-weight: 600; color: var(--wtyt-ink); }
+    /* Horizontal tile — exactly 3 lines: name+badge, one-line explainer, quality/speed/cost. */
+    .model-card { padding: 9px 14px; display: flex; flex-direction: column; gap: 2px; }
+    .model-card .name { font-size: 14px; }
+    .model-card .short { font-size: 12.5px; color: var(--wtyt-ink-2); }
+    .model-card .stats { font-size: 11.5px; color: var(--wtyt-ink-2); }
     .cost-note {
       font-size: 12px; color: var(--wtyt-ink-2); margin-top: 10px;
       background: var(--wtyt-layer); border-radius: 8px; padding: 8px 10px;
@@ -73,78 +96,151 @@
     #status { font-size: 13px; min-height: 18px; }
     #status.ok { color: var(--wtyt-good); }
     #status.err { color: var(--wtyt-bad); }
+    /* Key-test result shows right under the Test button, not down in the footer status bar. */
+    .key-status { font-size: 13px; margin-top: 6px; min-height: 16px; text-align: right; }
+    .key-status.ok { color: var(--wtyt-good); }
+    .key-status.err { color: var(--wtyt-bad); }
     a { color: var(--wtyt-accent); }
+    details.adv > summary { cursor: pointer; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wtyt-ink-2); font-weight: 600; user-select: none; }
+    details.adv[open] > summary { margin-bottom: 4px; }
+    /* Top-level "AI provider" reads as a real section header, not the tiny eyebrow the
+       nested (API key / Model) disclosures use. */
+    details.adv.provider > summary { font-size: 15px; text-transform: none; letter-spacing: normal; color: var(--wtyt-ink); font-weight: 700; }
+    details.adv.provider > summary h2 { display: inline; margin: 0; font: inherit; color: inherit; }
+    .provider-body { margin-top: 16px; }
+    details.adv.sub { margin-top: 22px; } /* space above API key + Model within the provider block */
+
+    /* Saved-notes CTA — moved above AI provider, given a bit of visual flair
+       (icon tile + accent wash) so it reads as a real destination, not an afterthought. */
+    .notes-cta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      border: 1.5px solid var(--wtyt-border);
+      border-radius: 14px;
+      background: var(--wtyt-accent-wash);
+    }
+    .notes-cta-icon {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      border-radius: 12px;
+      background: var(--wtyt-surface);
+      border: 1px solid var(--wtyt-border);
+    }
+    .notes-cta-body { flex: 1; min-width: 0; }
+    .notes-cta-body h2 {
+      margin: 0 0 4px;
+      font-size: 15px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: normal;
+      color: var(--wtyt-ink);
+    }
+    .notes-cta-body .hint { margin: 0 0 12px; }
   </style>
 </head>
 <body>
   <h1>WTYT · Watch The YouTube Things</h1>
-  <p class="sub">Adds a watch / read / skip verdict to videos on your home feed, video pages, and playlists. Your key and settings stay in this browser.</p>
+  <p class="sub">Adds a watch / read / listen / skip verdict to videos on your home feed, video pages, and playlists. Your key and settings stay in this browser.</p>
 
-  <section>
-    <h2>AI provider</h2>
-    <div class="provider-cards">
-      <label class="provider-card" data-provider="anthropic">
-        <input type="radio" name="provider" value="anthropic" />
-        <div class="name">Claude · Anthropic</div>
-        <div class="desc">Best judgment. Pay-as-you-go API. Note a Claude.ai subscription does <strong>not</strong> include API access.</div>
-      </label>
-      <label class="provider-card" data-provider="groq">
-        <input type="radio" name="provider" value="groq" />
-        <div class="name">Groq <span class="tag free">FREE</span></div>
-        <div class="desc">Free tier, no credit card. Runs GPT-OSS 120B and Llama — fast enough to score a feed. The easiest way to try WTYT.</div>
-      </label>
+  <section class="notes-cta">
+    <div class="notes-cta-icon" aria-hidden="true">📑</div>
+    <div class="notes-cta-body">
+      <h2>Saved notes</h2>
+      <div class="hint">Videos you saved with the Save button on a WTYT card. Opens a grid; tap any card for its reader view.</div>
+      <button id="savedNotes" class="btn-primary" type="button">Open saved notes →</button>
     </div>
   </section>
 
   <section>
-    <h2 id="keyHeading">API key</h2>
-    <label class="field-label" for="apiKey">Your key</label>
-    <div class="key-row">
-      <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
-      <button id="toggleKey" class="btn-ghost" type="button">Show</button>
-      <button id="testKey" class="btn-ghost" type="button">Test</button>
-    </div>
-    <div class="hint" id="keyHint"></div>
-  </section>
+    <details class="adv provider" open>
+      <summary><h2>AI provider</h2></summary>
+      <div class="provider-body">
+        <div class="provider-cards">
+          <label class="provider-card" data-provider="groq">
+            <input type="radio" name="provider" value="groq" />
+            <div class="name">Groq <span class="tag free">FREE</span></div>
+            <div class="desc">Free tier, no credit card. Runs Llama 3.3 70B and GPT-OSS — fast enough to score a feed. The easiest way to start.</div>
+          </label>
+          <label class="provider-card" data-provider="anthropic">
+            <input type="radio" name="provider" value="anthropic" />
+            <div class="name">Claude · Anthropic</div>
+            <div class="desc">Sharpest judgment. Pay-as-you-go API. Note a Claude.ai subscription does <strong>not</strong> include API access.</div>
+          </label>
+        </div>
 
-  <section>
-    <h2>Model · quality vs. cost</h2>
-    <div class="model-cards" id="modelCards"></div>
-    <div class="cost-note" id="costNote"></div>
-  </section>
+        <details class="adv sub" open>
+          <summary><h4 id="keyHeading">API key</h4></summary>
+          <div style="margin-top:12px">
+            <label class="field-label" for="apiKey">Your key</label>
+            <div class="key-row">
+              <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+              <button id="toggleKey" class="btn-ghost" type="button">Show</button>
+              <button id="testKey" class="btn-ghost" type="button">Test</button>
+            </div>
+            <div id="keyStatus" class="key-status"></div>
+            <div class="hint" id="keyHint"></div>
+          </div>
+        </details>
 
-  <section>
-    <h2>Automatic analysis</h2>
-    <label class="checkline"><input type="checkbox" id="autoAnalyze" /> <span>Score videos automatically</span></label>
-    <div class="hint">On: video pages score on open, and the home feed scores as you scroll (in batches). Off: nothing runs until you click the WTYT button. Playlists are always button-triggered.</div>
-    <div style="margin-top:14px">
-      <label class="field-label" for="homeBatch">Home-feed batch size</label>
-      <input type="number" id="homeBatch" min="1" max="100" style="max-width:160px" />
-      <div class="hint">Videos auto-scored per batch on the home feed before the Continue button appears. Cached videos are free and do not count.</div>
-    </div>
-  </section>
-
-  <section>
-    <h2>Run limits</h2>
-    <div class="row2">
-      <div>
-        <label class="field-label" for="maxVideos">Max videos per run</label>
-        <input type="number" id="maxVideos" min="1" max="100" />
-        <div class="hint">Top of the playlist down.</div>
+        <details class="adv sub" open>
+          <summary><h4>Model · quality vs. cost</h4></summary>
+          <div style="margin-top:12px">
+            <div class="model-cards" id="modelCards"></div>
+            <div class="cost-note" id="costNote"></div>
+          </div>
+        </details>
       </div>
-      <div>
-        <label class="field-label" for="commentViewThreshold">Comment cross-check threshold</label>
-        <input type="number" id="commentViewThreshold" min="0" step="10000" />
-        <div class="hint">Videos at/above this view count get their top comments pulled to double-check the ratings.</div>
+    </details>
+  </section>
+
+  <section>
+    <details class="adv" open>
+      <summary>Automatic analysis</summary>
+      <div style="margin-top:16px">
+        <label class="checkline"><input type="checkbox" id="autoScoreVideos" /> <span>Auto-score videos</span></label>
+        <div class="hint">On: video pages score as soon as you open them, and the home feed scores as you scroll (in batches). Off: nothing runs until you click the WTYT button.</div>
+        <label class="checkline" style="margin-top:14px"><input type="checkbox" id="autoScorePlaylists" /> <span>Auto-score playlists</span></label>
+        <div class="hint">On: a playlist scores automatically when you open it. Off: click "WTYT · Analyze playlist" to start it yourself.</div>
       </div>
-    </div>
+    </details>
+  </section>
+
+  <section>
+    <details class="adv">
+      <summary>Advanced settings</summary>
+      <div style="margin-top:16px">
+        <label class="field-label" for="homeBatch">Home-feed batch size</label>
+        <input type="number" id="homeBatch" min="1" max="100" style="max-width:160px" />
+        <div class="hint">Videos auto-scored per batch on the home feed before the Continue button appears. Cached videos are free and do not count.</div>
+      </div>
+      <div class="row2" style="margin-top:16px">
+        <div>
+          <label class="field-label" for="maxVideos">Max videos per run</label>
+          <input type="number" id="maxVideos" min="1" max="100" />
+          <div class="hint">Top of the playlist down.</div>
+        </div>
+        <div>
+          <label class="field-label" for="commentViewThreshold">Comment cross-check threshold</label>
+          <input type="number" id="commentViewThreshold" min="0" step="10000" />
+          <div class="hint">Videos at/above this view count get their top comments pulled to double-check the ratings.</div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <div class="actions">
-    <button id="save" class="btn-primary" type="button">Save</button>
+    <button id="reset" class="btn-ghost" type="button">Reset to defaults</button>
     <button id="clearCache" class="btn-ghost" type="button">Clear cached analyses</button>
     <span id="status"></span>
   </div>
+  <p class="hint" style="margin-top:6px">Changes save automatically. Reset restores the default settings (your API keys are kept).</p>
 
   <script src="models.js"></script>
   <script src="options.js"></script>

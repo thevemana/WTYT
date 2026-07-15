@@ -3,17 +3,17 @@
 
 const SAMPLE_PLAYLIST = 'https://www.youtube.com/playlist?list=UUsXVk37bltHxD1rDPwtNM8Q';
 let step = 1;
-let provider = 'anthropic';
-let model = WTYT_MODELS.defaultModel.anthropic;
+let provider = 'groq'; // free, no-card path — the first-run default
+let model = WTYT_MODELS.defaultModel.groq;
 const keys = { anthropic: '', groq: '' };
 
 const $ = (id) => document.getElementById(id);
 
 chrome.storage.local.get(
-  { provider: 'anthropic', anthropicKey: '', groqKey: '', apiKey: '', model: '' },
+  { provider: 'groq', anthropicKey: '', groqKey: '', apiKey: '', model: '' },
   (items) => {
-    // Guard a stale saved provider (e.g. a pre-swap "gemini").
-    provider = items.provider === 'groq' ? 'groq' : 'anthropic';
+    // Guard a stale saved provider (e.g. a pre-swap "gemini") — anything but anthropic → free groq.
+    provider = items.provider === 'anthropic' ? 'anthropic' : 'groq';
     keys.anthropic = items.anthropicKey || items.apiKey || '';
     keys.groq = items.groqKey || '';
     model = WTYT_MODELS.models[provider].some((m) => m.id === items.model)
@@ -98,7 +98,15 @@ function saveKey() {
 }
 
 $('next').addEventListener('click', () => {
-  if (step === 2) saveKey(); // persist before leaving the key step
+  if (step === 2) {
+    // Don't let anyone finish onboarding with no key — they'd land on YouTube to silence.
+    // Require a non-empty key (not a passing Test, to avoid gating on transient network blips).
+    if (!$('apiKey').value.trim()) {
+      setStatus('Paste your key first — or pick the free Groq option above.', 'err');
+      return;
+    }
+    saveKey(); // persist before leaving the key step
+  }
   if (step < 3) { step++; render(); return; }
   saveKey();
   window.close();
@@ -117,6 +125,12 @@ $('testKey').addEventListener('click', () => {
     if (res && res.ok) { setStatus('Key works', 'ok'); saveKey(); }
     else setStatus(res?.error || 'Key test failed.', 'err');
   });
+});
+
+$('openYt').addEventListener('click', () => {
+  saveKey();
+  chrome.tabs.create({ url: 'https://www.youtube.com' });
+  window.close();
 });
 
 $('openDemo').addEventListener('click', () => {

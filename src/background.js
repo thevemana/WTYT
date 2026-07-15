@@ -15,19 +15,36 @@ Score on three axes, each 0-100:
    breakdowns with on-screen annotation). Content that needs visual detail for
    understanding scores high.
 
-2. ai_slop_score — likelihood this is low-effort AI-generated content-farm output.
-   Signals: generic phrasing, hollow superlatives, repetitive filler, listicle padding,
-   factual vagueness, unnatural narration cadence, scripts that never commit to a
-   specific claim. 0 = clearly a human with a point of view. 100 = certain slop.
+2. generic_score — how generic and low-effort the content is, regardless of who or what
+   made it. This measures QUALITY, not authorship. Signals: hollow superlatives, listicle
+   padding, factual vagueness, filler that pads runtime, unnatural cadence, scripts that
+   never commit to a specific claim, interchangeable "content" with no point of view.
+   0 = a specific, substantive piece with a real point of view (a lazy human video still
+   scores high here; a sharp AI-assisted one scores low). 100 = interchangeable filler.
 
 3. readability_score — how fully the video's essence survives being turned into a
    short written distillation. Talky, information-dense videos score high; vibes,
    performances, and visual demonstrations score low.
 
+Then judge two more things:
+
+4. ai_provenance + ai_confidence — was this made by a human, made WITH ai assistance, or
+   fully AI-GENERATED? Return ai_provenance: "human" | "ai_assisted" | "ai_generated".
+   Detecting this from a transcript is HARD and easy to get wrong. Only set
+   ai_confidence:"high" when MULTIPLE strong signals agree (unmistakable synthetic-voice
+   cadence, telltale generic-AI phrasing, and a total absence of lived human specificity).
+   Use "med" when some signals point that way but you are not sure; use "low" when there is
+   little to go on. Only "high" is ever shown to the user, so reserve it. When unsure, return
+   "human" with ai_confidence:"low" — a wrong "AI-generated" label is far worse than a missed one.
+
+5. is_music — true if this is primarily a music video, song, live set, or performance where
+   the point is to LISTEN, not watch or read. If true, set verdict "listen".
+
 Verdict rules:
-- "watch": genuinely visual AND worth the time (high watch_score, low ai_slop_score).
+- "watch": genuinely visual AND worth the time (high watch_score, low generic_score).
 - "read": informative but not visual — the viewer should read your distillation and reclaim the time.
-- "skip": low value, redundant, or slop.
+- "listen": primarily music/audio — just listen; watchability and readability don't apply.
+- "skip": low value, redundant, or generic filler.
 
 If top comments are provided, use them as a cross-check on your scores: commenters
 reliably call out AI voices, stolen/re-uploaded content, factual errors, and clickbait —
@@ -40,9 +57,12 @@ If the transcript is missing, judge only from metadata, say so, and keep scores 
 Respond with ONLY a JSON object, no markdown fences, exactly this shape:
 {
   "watch_score": <0-100>,
-  "ai_slop_score": <0-100>,
+  "generic_score": <0-100>,
   "readability_score": <0-100>,
-  "verdict": "watch" | "read" | "skip",
+  "ai_provenance": "human" | "ai_assisted" | "ai_generated",
+  "ai_confidence": "low" | "med" | "high",
+  "is_music": <boolean>,
+  "verdict": "watch" | "read" | "listen" | "skip",
   "one_liner": "<max 120 chars: what this video is and why the verdict>",
   "key_takeaways": ["<2-4 short bullets of the actual substance>"],
   "read_instead": "<3-5 sentence distillation IF verdict is read, else empty string>",
@@ -90,10 +110,62 @@ function parseAnalysis(text) {
   const end = raw.lastIndexOf('}');
   if (start === -1 || end === -1) throw new Error('model returned no JSON');
   const analysis = JSON.parse(raw.slice(start, end + 1));
-  if (!['watch', 'read', 'skip'].includes(analysis.verdict)) {
+  if (!['watch', 'read', 'listen', 'skip'].includes(analysis.verdict)) {
     throw new Error('model returned invalid verdict');
   }
+  // Normalize the provenance fields so a drifting open model can't break the contract.
+  if (!['human', 'ai_assisted', 'ai_generated'].includes(analysis.ai_provenance)) {
+    analysis.ai_provenance = 'human';
+  }
+  if (!['low', 'med', 'high'].includes(analysis.ai_confidence)) {
+    analysis.ai_confidence = 'low';
+  }
+  // Small open models sometimes emit a stringified boolean; treat "true" as true.
+  analysis.is_music = analysis.is_music === true || analysis.is_music === 'true';
   return analysis;
+}
+
+// A secondary "and also…" tag needs a stronger score than the 60 used for color-coding —
+// only flag a genuinely strong cross-axis, not a merely-decent one.
+const SECONDARY_THRESHOLD = 65;
+
+// Deterministic post-processing applied to every model response so the analysis contract
+// holds regardless of which (possibly small, possibly drifting) model produced it.
+function finalizeAnalysis(analysis, payload) {
+  // Music → LISTEN: watch/read/generic axes don't apply, so null them out.
+  if (analysis.is_music) analysis.verdict = 'listen';
+  if (analysis.verdict === 'listen') {
+    analysis.is_music = true;
+    analysis.watch_score = null;
+    analysis.readability_score = null;
+    analysis.generic_score = null;
+  }
+  // read_instead only belongs on a "read" verdict; community_check only when we actually
+  // sent comments (otherwise weaker models invent comment sentiment).
+  if (analysis.verdict !== 'read') analysis.read_instead = '';
+  if (!payload.comments?.length) delete analysis.community_check;
+  // Secondary tag computed here, not asked of the model — drift-proof across providers.
+  // cards.js maps these values to labels; keep the two in sync.
+  analysis.secondary_tag = null;
+  if (analysis.verdict === 'watch' && Number(analysis.readability_score) >= SECONDARY_THRESHOLD) {
+    analysis.secondary_tag = 'strong_read';
+  } else if (analysis.verdict === 'read' && Number(analysis.watch_score) >= SECONDARY_THRESHOLD) {
+    analysis.secondary_tag = 'watchable';
+  }
+  return analysis;
+}
+
+// ---- retry helpers -----------------------------------------------------------
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Pull a retry delay from a 429: prefer the Retry-After header (seconds), else parse
+// Groq's "Please try again in 7.3s" out of the error message. Returns ms (0 if none).
+function parseRetryAfter(header, message) {
+  const secs = Number(header);
+  if (Number.isFinite(secs) && secs > 0) return secs * 1000;
+  const m = /try again in ([\d.]+)\s*s/i.exec(message || '');
+  return m ? Math.ceil(parseFloat(m[1]) * 1000) : 0;
 }
 
 // ---- Anthropic ---------------------------------------------------------------
@@ -115,7 +187,7 @@ async function anthropicComplete({ apiKey, model }, { system, user, maxTokens, p
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try { detail = (await res.json()).error?.message || detail; } catch { /* keep */ }
-    return { error: `Anthropic API: ${detail}` };
+    return { error: `Anthropic API: ${detail}`, status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('retry-after'), detail) };
   }
   if (probe) return { ok: true };
   const data = await res.json();
@@ -136,6 +208,13 @@ async function groqComplete({ apiKey, model }, { system, user, maxTokens, probe 
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       };
+  // gpt-oss is a reasoning model: without a low reasoning budget it spends the whole token
+  // ceiling "thinking" and never emits the JSON (Groq then 400s with failed_generation).
+  // Cap reasoning and give the body room to finish the object.
+  if (!probe && /gpt-oss/.test(model)) {
+    body.reasoning_effort = 'low';
+    body.max_tokens = Math.max(maxTokens, 1400);
+  }
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
@@ -144,7 +223,7 @@ async function groqComplete({ apiKey, model }, { system, user, maxTokens, probe 
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try { detail = (await res.json()).error?.message || detail; } catch { /* keep */ }
-    return { error: `Groq API: ${detail}` };
+    return { error: `Groq API: ${detail}`, status: res.status, retryAfterMs: parseRetryAfter(res.headers.get('retry-after'), detail) };
   }
   if (probe) return { ok: true };
   const data = await res.json();
@@ -158,28 +237,61 @@ function completeFor(provider) {
 
 // ---- orchestration -----------------------------------------------------------
 
+// Free-tier open models fail in two recoverable ways: Groq rate-limits (429, with a
+// "try again in Ns" the response tells us), and small models occasionally emit malformed
+// JSON. Both clear on a short retry, so back off and try again rather than surfacing a raw
+// error — the free path is the default, so it has to survive these.
+const MAX_RETRIES = 2;
+const MAX_BACKOFF_MS = 30000; // honor Groq's rate-limit waits (seen up to ~24s), but not absurd ones
+
+// Groq's free tier caps tokens per DAY per model (e.g. ~100k on the 70B). When the chosen
+// model is tapped out for the day — a 429 whose wait we won't sit through — fall through this
+// chain to a model that still has budget, so the free path keeps working. Best judgment first.
+const GROQ_FALLBACK = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'];
+
 async function analyze(payload) {
   const settings = payload.settings || {};
-  const { apiKey, model } = settings;
+  const { apiKey } = settings;
   if (!apiKey) return { error: 'No API key configured' };
   const provider = providerOf(settings);
+  const complete = completeFor(provider);
+  const req = { system: SYSTEM_PROMPT, user: buildUserContent(payload), maxTokens: 900 };
 
-  const out = await completeFor(provider)(
-    { apiKey, model },
-    { system: SYSTEM_PROMPT, user: buildUserContent(payload), maxTokens: 900 }
-  );
-  if (out.error) return { error: out.error };
-  try {
-    const analysis = parseAnalysis(out.text);
-    // Deterministic guards — model-independent, so smaller open models can't drift:
-    // read_instead only belongs on a "read" verdict; community_check only when we
-    // actually sent comments (otherwise weaker models invent comment sentiment).
-    if (analysis.verdict !== 'read') analysis.read_instead = '';
-    if (!payload.comments?.length) delete analysis.community_check;
-    return { analysis };
-  } catch (e) {
-    return { error: e.message };
+  // Only Groq gets a model chain; Anthropic just uses the chosen model.
+  const chain = provider === 'groq'
+    ? [settings.model, ...GROQ_FALLBACK.filter((m) => m !== settings.model)]
+    : [settings.model];
+
+  let lastError = 'Analysis failed';
+  for (let mi = 0; mi < chain.length; mi++) {
+    const model = chain[mi];
+    let rateLimited = false;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const out = await complete({ apiKey, model }, req);
+      if (out.error) {
+        lastError = out.error;
+        // Short window (per-minute limit): wait it out and retry the SAME model.
+        if (out.status === 429 && out.retryAfterMs && out.retryAfterMs <= MAX_BACKOFF_MS && attempt < MAX_RETRIES) {
+          await sleep(out.retryAfterMs + 250);
+          continue;
+        }
+        // Long/again rate-limit (daily cap): don't wait — drop to the next model in the chain.
+        if (out.status === 429) { rateLimited = true; break; }
+        return { error: out.error };
+      }
+      try {
+        const analysis = finalizeAnalysis(parseAnalysis(out.text), payload);
+        if (model !== settings.model) analysis.model_fallback = model; // note the swap for the UI
+        return { analysis };
+      } catch (e) {
+        lastError = e.message;
+        if (attempt < MAX_RETRIES) { await sleep(400); continue; } // malformed JSON — retry
+        return { error: lastError };
+      }
+    }
+    if (!rateLimited) break; // a non-rate-limit failure won't be fixed by switching models
   }
+  return { error: lastError };
 }
 
 // Cheapest possible round-trip to prove a key + model actually work.
@@ -204,6 +316,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'openOptions') {
     chrome.runtime.openOptionsPage();
+  }
+  if (msg.type === 'openNotes') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/notes.html') });
   }
 });
 

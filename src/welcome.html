@@ -29,7 +29,7 @@
     .verdicts { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
     .v { flex: 1; min-width: 150px; border: 1px solid var(--wtyt-border); border-radius: 10px; padding: 10px 12px; }
     .v .pill { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 999px; color: #fff; }
-    .v .pill.watch { background: #2ba640; } .v .pill.read { background: #3170c7; } .v .pill.skip { background: #7d7d7d; }
+    .v .pill.watch { background: #2ba640; } .v .pill.read { background: #3170c7; } .v .pill.listen { background: #7c4dff; } .v .pill.skip { background: #7d7d7d; }
     .v p { font-size: 12.5px; margin: 8px 0 0; color: var(--wtyt-ink-2); }
     ul.where { margin: 8px 0 0; padding-left: 20px; font-size: 14px; color: var(--wtyt-ink-2); }
     ul.where li { margin-bottom: 4px; }
@@ -56,6 +56,9 @@
     .m .md { font-size: 12px; color: var(--wtyt-ink-2); margin-top: 3px; }
     .callout { border: 1px solid var(--wtyt-border); background: var(--wtyt-layer); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-top: 14px; }
     .callout strong { color: var(--wtyt-ink); }
+    details.adv { margin-top: 12px; }
+    details.adv > summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--wtyt-ink-2); user-select: none; }
+    details.adv[open] > summary { margin-bottom: 8px; }
 
     .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; }
     #stepStatus { font-size: 13px; }
@@ -78,13 +81,14 @@
       <div class="verdicts">
         <div class="v"><span class="pill watch">WATCH</span><p>Genuinely visual. Worth your eyes.</p></div>
         <div class="v"><span class="pill read">READ</span><p>Informative but not visual. Read the 1-minute gist and reclaim the time.</p></div>
-        <div class="v"><span class="pill skip">SKIP</span><p>Low value, redundant, or slop.</p></div>
+        <div class="v"><span class="pill listen">LISTEN</span><p>Music or a performance — just press play and listen.</p></div>
+        <div class="v"><span class="pill skip">SKIP</span><p>Low value, redundant, or generic filler.</p></div>
       </div>
       <p class="muted"><strong>Where it works:</strong></p>
       <ul class="where">
-        <li>Your <strong>home feed</strong> and <strong>Watch Later</strong>, scored as you scroll</li>
+        <li>Your <strong>home feed</strong>, scored as you scroll</li>
         <li>Any <strong>video page</strong>, scored automatically in the up-next rail</li>
-        <li>Any <strong>playlist</strong>. It only recommends, and never touches your account or plays anything.</li>
+        <li>Any <strong>playlist</strong> (including <strong>Watch Later</strong>) — click the WTYT button to scan it. It only recommends, and never touches your account or plays anything.</li>
       </ul>
     </div>
 
@@ -95,31 +99,33 @@
       <p class="muted">WTYT sends each transcript to an AI model to score it. The key stays in this browser and goes straight to the provider. No middle-man server. Pick a provider:</p>
 
       <div class="providers">
-        <div class="p sel" data-provider="anthropic">
-          <div class="pt">Claude · Anthropic</div>
-          <div class="pd">Best judgment. Paid, pay-as-you-go API.</div>
-        </div>
-        <div class="p" data-provider="groq">
+        <div class="p sel" data-provider="groq">
           <div class="pt">Groq <span class="tag free">FREE</span></div>
-          <div class="pd">Free tier, fast. Runs GPT-OSS &amp; Llama. No card.</div>
+          <div class="pd">Free tier, fast. No credit card. Runs GPT-OSS &amp; Llama.</div>
+        </div>
+        <div class="p" data-provider="anthropic">
+          <div class="pt">Claude · Anthropic</div>
+          <div class="pd">Sharpest judgment. Paid, pay-as-you-go API.</div>
         </div>
       </div>
 
       <div class="callout" id="normalAccount">
-        <strong>No paid API?</strong> A Claude.ai subscription does not include API access. Pick <strong>Groq</strong> above and create a free key at console.groq.com — no credit card, and its free tier is fast enough to score a feed.
+        <strong>Start free with Groq</strong> — create a key at console.groq.com in about 30 seconds, no credit card. Prefer Claude's sharper judgment? It needs a paid API key (note: a Claude.ai subscription does <strong>not</strong> include API access).
       </div>
 
-      <label class="fl" for="apiKey" id="keyLabel">Anthropic API key</label>
+      <label class="fl" for="apiKey" id="keyLabel">Groq API key</label>
       <div class="key-row">
-        <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+        <input type="password" id="apiKey" placeholder="gsk_..." autocomplete="off" spellcheck="false" />
         <button id="testKey" class="btn-ghost" type="button">Test</button>
       </div>
       <div class="hint" id="keyHint"></div>
 
-      <label class="fl">Model</label>
-      <div class="models" id="modelChips"></div>
-      <div class="hint" id="qualLine"></div>
-      <div class="hint">You can change the provider, model, and limits anytime from the extension's settings.</div>
+      <details class="adv">
+        <summary>Advanced — choose model</summary>
+        <div class="models" id="modelChips"></div>
+        <div class="hint" id="qualLine"></div>
+      </details>
+      <div class="hint">A good default is picked for you. Change the provider, model, and limits anytime in settings.</div>
     </div>
 
     <!-- Step 3: Try it -->
@@ -127,12 +133,12 @@
       <div class="stepnum">Step 3 of 3 · Try it</div>
       <h1>See it in action.</h1>
       <ol class="try-list">
-        <li>Open your <strong>home feed</strong> or any <strong>video</strong>. Scoring starts on its own.</li>
-        <li>On the home feed, cards attach to each thumbnail as you scroll.</li>
+        <li>Open your <strong>home feed</strong> or any <strong>video</strong> — scoring starts on its own.</li>
+        <li>On a busy feed, WTYT scores in batches and pauses; tap <strong>Continue</strong> to keep going.</li>
         <li>For playlists, click the floating <strong>WTYT · Analyze playlist</strong> button, top-right.</li>
       </ol>
-      <p class="muted">Cards appear as each video is scored. Re-opening is instant and free for 14 days. You can turn auto-scoring off anytime in settings.</p>
-      <button id="openDemo" class="btn-ghost" type="button" style="margin-top:6px">Open a sample playlist</button>
+      <button id="openYt" class="btn-primary" type="button" style="margin-top:6px">Open YouTube</button>
+      <button id="openDemo" class="btn-ghost" type="button" style="margin-top:6px">Or try a sample playlist</button>
     </div>
 
     <div class="nav">

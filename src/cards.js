@@ -6,6 +6,9 @@
 
 const WTYT_CARDS = (() => {
   const READ_WPM = 238; // Brysbaert 2019 silent non-fiction reading rate
+  // Generic only earns a chip when it's a real negative signal — below this it's just
+  // noise on a triage glance, so a clean video shows a two-bar Watch/Read row instead.
+  const GENERIC_SHOW_AT = 60;
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -28,14 +31,37 @@ const WTYT_CARDS = (() => {
   const VERDICTS = {
     watch: { label: 'WATCH', cls: 'wtyt-verdict-watch', icon: 'watch' },
     read: { label: 'READ', cls: 'wtyt-verdict-read', icon: 'read' },
+    listen: { label: 'LISTEN', cls: 'wtyt-verdict-listen', icon: 'listen' },
     skip: { label: 'SKIP', cls: 'wtyt-verdict-skip', icon: 'slop' },
   };
+
+  // Secondary tag: a primary verdict can carry one "and also…" note (computed in background.js
+  // as analysis.secondary_tag — keep these label keys in sync with that logic).
+  const SECONDARY = { strong_read: 'also a strong read', watchable: 'also worth watching' };
+  // AI-provenance badge labels — only ai_assisted / ai_generated ever surface (human is silent).
+  const PROVENANCE = { ai_assisted: 'AI-assisted', ai_generated: 'AI-generated' };
 
   function verdictPill(analysis) {
     const v = VERDICTS[analysis.verdict] || VERDICTS.skip;
     const pill = el('span', 'wtyt-verdict ' + v.cls);
     pill.append(icon(v.icon, 15), el('span', 'wtyt-verdict-label', v.label));
     return pill;
+  }
+
+  function secondaryTag(analysis) {
+    const label = SECONDARY[analysis.secondary_tag];
+    return label ? el('span', 'wtyt-secondary', '(' + label + ')') : null;
+  }
+
+  // Gated 2-state: show a badge ONLY when the model is highly confident it isn't human-made.
+  // A wrong "AI-generated" label on a real creator is worse than a missed one, so low/med → nothing.
+  function aiBadge(analysis) {
+    if (analysis.ai_confidence !== 'high') return null;
+    const label = PROVENANCE[analysis.ai_provenance];
+    if (!label) return null;
+    const badge = el('span', 'wtyt-aibadge');
+    badge.append(icon('ai', 13), el('span', null, label));
+    return badge;
   }
 
   function summaryEl(text) {
@@ -74,10 +100,72 @@ const WTYT_CARDS = (() => {
 
   function scoreRow(analysis) {
     const row = el('div', 'wtyt-scorerow');
+    if (analysis.verdict === 'listen') return row; // music: score axes don't apply
     row.append(iconChip('watch', 'Watch score', analysis.watch_score));
     row.append(iconChip('read', 'Read value', analysis.readability_score));
-    row.append(iconChip('slop', 'Slop', analysis.ai_slop_score, true));
+    if (Number(analysis.generic_score) >= GENERIC_SHOW_AT) {
+      row.append(iconChip('slop', 'Generic — higher is worse', analysis.generic_score, true));
+    }
+    const badge = aiBadge(analysis);
+    if (badge) { badge.classList.add('wtyt-aibadge-chip'); row.append(badge); }
     return row;
+  }
+
+  // A saved/openable note = the analysis fields + the video meta. Built here so the
+  // Save button and the reader chip carry identical data. Thumbnail is derived, no blob.
+  function buildNote(analysis, video) {
+    return {
+      ...analysis,
+      id: video.id,
+      url: video.url || `https://www.youtube.com/watch?v=${video.id}`,
+      title: video.title || '',
+      channel: video.channel || '',
+      thumbnail: `https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`,
+    };
+  }
+
+  // Head toolbar (playlist + watch only — never home): a clickable "~N min read" chip
+  // that opens the reader overlay, and a Save button that stashes the note.
+  function toolbar(analysis, video) {
+    const note = buildNote(analysis, video);
+    const tools = el('div', 'wtyt-tools');
+
+    if (analysis.transcript_text) {
+      const chip = el('button', 'wtyt-tool wtyt-readtime');
+      chip.type = 'button';
+      chip.append(icon('read', 14), el('span', null, `~${readMinutes(analysis.transcript_text)} min read`));
+      chip.addEventListener('click', (e) => { e.stopPropagation(); WTYT_READER.openOverlay(note); });
+      tools.append(chip);
+    }
+
+    // Save toggle, kept in sync across the card and the reader overlay via a window event
+    // (both live in the page) so saving in one place updates the other without a reload.
+    const save = el('button', 'wtyt-tool wtyt-save', 'Save');
+    save.type = 'button';
+    let saved = false;
+    const reflect = (isSaved) => {
+      saved = isSaved;
+      save.textContent = isSaved ? 'Saved ✓' : 'Save';
+      save.classList.toggle('wtyt-saved', isSaved);
+    };
+    WTYT_NOTES.get(note.id).then((n) => reflect(!!n));
+    window.addEventListener('wtyt-note-changed', (e) => { if (e.detail && e.detail.id === note.id) reflect(e.detail.saved); });
+    save.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const next = !saved;
+      (next ? WTYT_NOTES.save(note) : WTYT_NOTES.remove(note.id)).then(() =>
+        window.dispatchEvent(new CustomEvent('wtyt-note-changed', { detail: { id: note.id, saved: next } }))
+      );
+    });
+    tools.append(save);
+
+    // Jump to the saved-notes page — there was no way to reach it from a card before.
+    const notesLink = el('button', 'wtyt-tool wtyt-noteslink', 'Notes ↗');
+    notesLink.type = 'button';
+    notesLink.title = 'Open your saved notes';
+    notesLink.addEventListener('click', (e) => { e.stopPropagation(); chrome.runtime.sendMessage({ type: 'openNotes' }); });
+    tools.append(notesLink);
+    return tools;
   }
 
   // ---- full card (playlist + watch) --------------------------------------------
@@ -85,16 +173,50 @@ const WTYT_CARDS = (() => {
   function render(analysis, opts = {}) {
     const card = el('div', 'wtyt-card');
 
+    // Line 1: verdict pill left, actions (read-time chip + Save) pinned right. Nothing
+    // variable-width sits between them, so this row never wraps regardless of card width.
     const head = el('div', 'wtyt-head');
-    head.append(verdictPill(analysis));
-    head.append(el('span', 'wtyt-oneliner', analysis.one_liner || ''));
+    const pill = verdictPill(analysis);
+    // The verdict pill opens the reader too (same as the read-time chip) when there's content.
+    if (opts.tools && opts.video && analysis.transcript_text) {
+      pill.classList.add('wtyt-clickable');
+      pill.addEventListener('click', (e) => { e.stopPropagation(); WTYT_READER.openOverlay(buildNote(analysis, opts.video)); });
+    }
+    head.append(pill);
+    if (opts.tools && opts.video) head.append(toolbar(analysis, opts.video));
     card.append(head);
 
-    const scores = el('div', 'wtyt-scores');
-    scores.append(scoreChip('Watch', analysis.watch_score));
-    scores.append(scoreChip('Read', analysis.readability_score));
-    scores.append(scoreChip('Slop', analysis.ai_slop_score, true));
-    card.append(scores);
+    // Line 2: the full one-liner on its own line — never truncated.
+    if (analysis.one_liner) card.append(el('p', 'wtyt-oneliner', analysis.one_liner));
+
+    // Quiet aside beneath the one-liner: secondary "and also…" tag + gated AI badge.
+    const sec = secondaryTag(analysis);
+    const badge = aiBadge(analysis);
+    if (sec || badge) {
+      const aside = el('div', 'wtyt-aside');
+      if (sec) aside.append(sec);
+      if (badge) aside.append(badge);
+      card.append(aside);
+    }
+
+    if (analysis.verdict === 'listen') { // music: watch/read/generic axes are N/A
+      card.classList.add('wtyt-card-minimal'); // reads as a deliberate stop, not a cut-off card
+    } else {
+      const scores = el('div', 'wtyt-scores');
+      scores.append(scoreChip('Watch', analysis.watch_score));
+      scores.append(scoreChip('Read', analysis.readability_score));
+      if (Number(analysis.generic_score) >= GENERIC_SHOW_AT) {
+        const g = scoreChip('Generic', analysis.generic_score, true);
+        g.title = 'How generic / low-effort this is — higher is worse';
+        scores.append(g);
+      }
+      card.append(scores);
+    }
+
+    // Free-tier fallback: the chosen model was tapped out for the day, so a backup scored this.
+    if (analysis.model_fallback) {
+      card.append(el('div', 'wtyt-fallback-note', '⚡ Backup model — daily limit reached'));
+    }
 
     if (analysis.community_check && analysis.community_check.note) {
       const cc = analysis.community_check;
@@ -119,28 +241,40 @@ const WTYT_CARDS = (() => {
       card.append(details);
     }
 
-    // Full transcript on demand, with the read-time value prop baked into the label.
+    // Full transcript on demand. The read-time value prop is baked into the label only
+    // when there's no head toolbar chip already showing it (playlist/watch) — the home
+    // expand card has no toolbar, so it keeps the read-time here.
     if (analysis.transcript_text) {
       const t = el('details', 'wtyt-details wtyt-transcript');
       if (opts.open) t.open = true;
       const src = analysis.transcript_source === 'auto-captions' ? 'View transcript (auto-captions)' : 'View transcript';
-      t.append(summaryEl(`${src} · ~${readMinutes(analysis.transcript_text)} min read`));
+      const label = opts.tools ? src : `${src} · ~${readMinutes(analysis.transcript_text)} min read`;
+      t.append(summaryEl(label));
       t.append(el('div', 'wtyt-transcript-body', analysis.transcript_text));
       card.append(t);
     }
     return card;
   }
 
-  function renderPending(statusText) {
-    const card = el('div', 'wtyt-card wtyt-pending');
-    card.append(el('span', 'wtyt-spinner'));
+  function renderPending(statusText, state) {
+    // Skeleton reserves roughly a card's height so the queued→scoring→result swap doesn't shift the page.
+    const card = el('div', 'wtyt-card wtyt-pending wtyt-skeleton');
+    // Match the home lifecycle icons: a clock for a queued row, the spinner while scoring.
+    card.append(state === 'queued' ? icon('clock', 14, 'wtyt-pending-ic') : el('span', 'wtyt-spinner'));
     card.append(el('span', null, statusText || 'Analyzing…'));
     return card;
   }
 
-  function renderError(message) {
+  function renderError(message, opts = {}) {
     const card = el('div', 'wtyt-card wtyt-error');
-    card.append(icon('close', 14), el('span', null, message));
+    card.append(icon('warn', 14), el('span', null, message));
+    if (opts.onRetry) {
+      const r = el('button', 'wtyt-retry-btn');
+      r.type = 'button';
+      r.append(icon('retry', 13), el('span', null, 'Retry'));
+      r.addEventListener('click', (e) => { e.stopPropagation(); opts.onRetry(); });
+      card.append(r);
+    }
     return card;
   }
 
@@ -154,6 +288,7 @@ const WTYT_CARDS = (() => {
 
   // Playlist: mount inside the row's metadata column (v2 behaviour).
   function attach(row, card) {
+    if (!row) return card; // row virtualized away mid-run — nothing to attach to (yet)
     const host = row.querySelector('#meta') || row.querySelector('.ytLockupViewModelMetadata') || row;
     host.querySelectorAll(':scope > .wtyt-card').forEach((n) => n.remove());
     contain(card);
@@ -162,12 +297,17 @@ const WTYT_CARDS = (() => {
   }
 
   // Watch: expansive panel, details + transcript open, injected atop the up-next rail.
-  function renderWatch(analysis) {
-    const card = render(analysis, { open: true });
+  function renderWatch(analysis, opts = {}) {
+    const card = render(analysis, { open: true, ...opts });
     card.classList.add('wtyt-watch');
     const brand = el('span', 'wtyt-brand');
     brand.append(icon('play', 13), el('span', null, 'WTYT'));
-    card.querySelector('.wtyt-head')?.append(brand);
+    // Brand lives in the top toolbar row (with the read-time chip + Save), pushed to the
+    // right by .wtyt-brand's own margin-left:auto. Falls back to the head row on the
+    // rare card that has no toolbar (opts.tools/video missing).
+    const tools = card.querySelector('.wtyt-tools');
+    if (tools) tools.append(brand);
+    else card.querySelector('.wtyt-head')?.append(brand);
     return contain(card);
   }
   function attachWatch(container, card) {
@@ -187,6 +327,53 @@ const WTYT_CARDS = (() => {
     meta.append(card);
   }
 
+  // ---- lifecycle state markers (0.4.1) -----------------------------------------
+  // Every scoreable tile shows a state before/while scoring so nothing reads as
+  // "skipped": queued → scoring → verdict. Ads get a static AD chip.
+  const STATE = {
+    queued: { icon: 'clock', label: 'Queued' },
+    scoring: { icon: 'spinner', label: 'Scoring' },
+    failed: { icon: 'warn', label: 'Failed' },
+    ad: { icon: null, label: 'AD' },
+  };
+
+  function stateOverlay(name, opts = {}) {
+    const spec = STATE[name] || STATE.queued;
+    const pill = el('span', 'wtyt-pill-overlay wtyt-state wtyt-state-' + name);
+    if (spec.icon) pill.append(icon(spec.icon, 14));
+    pill.append(el('span', 'wtyt-state-label', spec.label));
+    if (name === 'failed' && opts.onRetry) {
+      const r = el('button', 'wtyt-state-retry');
+      r.type = 'button';
+      r.title = 'Retry';
+      r.append(icon('retry', 12));
+      r.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); opts.onRetry(); });
+      pill.append(r);
+    }
+    return pill;
+  }
+
+  // Pin a lifecycle marker on a home tile's thumbnail — the same slot the verdict pill
+  // takes once scored, so the transition is a clean swap (attachHome clears prior overlays).
+  function markHome(lockup, name, opts = {}) {
+    if (!lockup) return;
+    const imageHost = lockup.querySelector('.ytLockupViewModelContentImage, ytd-thumbnail, #thumbnail')
+      || lockup.querySelector('a[href*="watch?v="]');
+    if (!imageHost) return;
+    imageHost.classList.add('wtyt-image-host');
+    imageHost.querySelectorAll(':scope > .wtyt-pill-overlay').forEach((n) => n.remove());
+    imageHost.append(stateOverlay(name, opts));
+  }
+
+  // Direct child of `container` that contains (or is) `node` — used to anchor the score
+  // row immediately above the title's own top-level wrapper, regardless of how deep the
+  // title text node sits inside YouTube's metadata markup.
+  function directChild(container, node) {
+    let n = node;
+    while (n && n.parentElement !== container) n = n.parentElement;
+    return n;
+  }
+
   function attachHome(lockup, analysis) {
     const imageHost = lockup.querySelector('.ytLockupViewModelContentImage') || lockup.querySelector('a[href*="watch?v="]');
     const meta = lockup.querySelector('.ytLockupViewModelMetadata') || lockup;
@@ -202,9 +389,18 @@ const WTYT_CARDS = (() => {
     }
     meta.querySelectorAll(':scope > .wtyt-scorerow, :scope > .wtyt-home-expand').forEach((n) => n.remove());
     const row = scoreRow(analysis);
-    row.addEventListener('click', expand);
-    meta.prepend(row);
+    if (row.childNodes.length) { // listen verdict yields an empty row — skip it
+      row.prepend(icon('check', 14, 'wtyt-scored-tick')); // done-tick: "this has been scored"
+      row.addEventListener('click', expand);
+      // Insert directly before the title's own wrapper so the row is always line 1 and
+      // the title is always line 2, however many siblings (avatar, channel line…) meta
+      // actually has — a blind prepend would only guarantee that by luck.
+      const titleEl = meta.querySelector('.ytLockupMetadataViewModelTitle, h3');
+      const anchor = titleEl && directChild(meta, titleEl);
+      if (anchor) meta.insertBefore(row, anchor);
+      else meta.prepend(row);
+    }
   }
 
-  return { render, renderPending, renderError, attach, renderWatch, attachWatch, attachHome };
+  return { render, renderPending, renderError, attach, renderWatch, attachWatch, attachHome, markHome };
 })();

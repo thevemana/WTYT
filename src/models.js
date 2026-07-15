@@ -4,7 +4,7 @@
 // estimates for a typical ~10-minute video. Groq is the free, no-paid-key path.
 
 const WTYT_MODELS = {
-  defaultModel: { anthropic: 'claude-haiku-4-5-20251001', groq: 'openai/gpt-oss-120b' },
+  defaultModel: { anthropic: 'claude-haiku-4-5-20251001', groq: 'llama-3.3-70b-versatile' },
 
   keyHint: {
     anthropic:
@@ -19,7 +19,7 @@ const WTYT_MODELS = {
     anthropic:
       'Real Anthropic rates: <strong>Haiku 4.5 $1/$5</strong>, <strong>Sonnet 5 $3/$15</strong> per million input/output tokens. A 25-video playlist runs roughly <strong>$0.15 on Haiku</strong> or <strong>$0.75 on Sonnet</strong>. Analyses are cached for 14 days, so re-opening a playlist is free.',
     groq:
-      "Groq's <strong>free tier</strong> costs nothing (rate-limited per minute and per day). <strong>GPT-OSS 120B</strong> gives the best free judgment; <strong>Llama 3.1 8B</strong> is fastest with the highest daily limit for bulk scans. A quota error means you hit the per-minute or per-day free limit — wait a moment or switch to the faster model. Analyses are cached 14 days.",
+      "Groq's <strong>free tier</strong> costs nothing (rate-limited per minute and per day). <strong>Llama 3.3 70B</strong> is the best all-round free pick with the most per-minute headroom; <strong>GPT-OSS 120B</strong> gives the sharpest judgment for a careful re-pass; <strong>Llama 3.1 8B</strong> is fastest with the highest daily limit for bulk scans. A quota error means you hit the per-minute or per-day free limit — wait a moment or switch models. Analyses are cached 14 days.",
   },
 
   models: {
@@ -49,15 +49,26 @@ const WTYT_MODELS = {
     ],
     groq: [
       {
-        id: 'openai/gpt-oss-120b',
-        name: 'GPT-OSS 120B',
+        id: 'llama-3.3-70b-versatile',
+        name: 'Llama 3.3 70B Versatile',
         tag: 'FREE · DEFAULT',
         tagClass: 'free',
-        best: 'Best free judgment. Follows the rubric and does not invent comment sentiment — measurably the strongest zero-cost pick.',
+        best: 'Best free all-rounder — strong rubric judgment with ~2× the per-minute limit of the 8B, and no reasoning-model JSON hiccups. The right free default.',
         quality: 'Very good',
         speed: '~1.5s / video',
         cost: 'Free tier',
-        short: 'Best free judgment.',
+        short: 'Best free all-rounder.',
+      },
+      {
+        id: 'openai/gpt-oss-120b',
+        name: 'GPT-OSS 120B',
+        tag: 'SHARPEST FREE',
+        tagClass: 'free',
+        best: 'Sharpest free judgment — follows the rubric closely and does not invent comment sentiment. A reasoning model, so best saved for a careful re-pass.',
+        quality: 'Very good',
+        speed: '~1.5s / video',
+        cost: 'Free tier',
+        short: 'Sharpest free judgment.',
       },
       {
         id: 'llama-3.1-8b-instant',
@@ -75,5 +86,5 @@ const WTYT_MODELS = {
 
   // One-line qualitative difference, shown during onboarding so users know why to pick.
   qualitativeLine:
-    'Claude (Haiku, Sonnet) has the sharpest judgment but needs a paid API key. Groq (GPT-OSS 120B, Llama 8B) is free — GPT-OSS 120B is close behind on judgment; Llama 8B is fastest for bulk.',
+    'Claude (Haiku, Sonnet) has the sharpest judgment but needs a paid API key. Groq is free — Llama 3.3 70B is the best all-round free pick with the most per-minute headroom, GPT-OSS 120B is sharpest for a careful re-pass, and Llama 8B is fastest for bulk.',
 };
