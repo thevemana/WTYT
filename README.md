@@ -1,75 +1,107 @@
 # WTYT — Watch The YouTube Things
 
-**Give every YouTube video a watch / read / skip verdict, so you spend your time only on what's worth it.**
+**Give every YouTube video a watch / read / listen / skip verdict, so you spend your time only on what's worth it.**
 
-WTYT is a browser extension for Chrome, Edge, Brave, and other Chromium browsers. It reads
-each video and drops a one-glance verdict on your **home feed**, on any **video page**, and
-on any **playlist** — then, for the ones you'd otherwise skim, hands you a written
-distillation so you can reclaim the time.
+WTYT is a Chromium browser extension (Chrome, Edge, Brave) that reads each video and drops a
+one-glance verdict on your **home feed**, on any **video page**, and on any **playlist** —
+then, for the ones you'd otherwise skim, hands you a written distillation you can read in a
+fraction of the time.
 
-![A WTYT READ card in the watch-page rail: verdict, score bars, community check, and a written distillation](assets/read-card.png)
+![WTYT verdict badges and score rows across a YouTube home feed, with ads and Shorts left untouched](assets/home-feed.png)
 
-- **WATCH** — genuinely visual, worth the minutes.
-- **READ** — informative but not visual; a distillation is included, reclaim the time.
-- **SKIP** — low value, redundant, or slop.
+It never touches your account or plays anything. It only reads, scores, and tells you — and
+every design choice below was made deliberately, not defaulted into.
 
-It never touches your account or plays anything. It only reads, scores, and tells you.
+**Jump to:** [Install](#install) · [The verdict](#the-verdict) · [Read it, save it, come back to it](#read-it-save-it-come-back-to-it) · [Bring your own AI key](#bring-your-own-ai-key--and-keep-it-working) · [Built to survive a site it doesn't control](#built-to-survive-a-site-it-doesnt-control) · [For builders](#for-builders) · [Known limitations](#known-limitations)
 
 ---
 
-## For everyone: what it does
+## Install
 
-### What each card shows
+1. Clone or download this repo → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the folder with `manifest.json`.
+2. Onboarding opens → pick **Groq** (free, [console.groq.com/keys](https://console.groq.com/keys)) or **Claude** (paid, [platform.claude.com](https://platform.claude.com/settings/keys)), paste your key, hit **Test**.
+3. Open your home feed, a video, or a playlist. Playlists use the **WTYT · Analyze playlist** button; everything else scores on its own.
 
-- **Verdict** — WATCH / READ / SKIP.
-- **Watch score** (0–100) — how much the value depends on actually watching. An essay read
-  over a black screen is a 0; an "Every Frame a Painting"-class visual piece is 100.
-- **Read score** (0–100) — how fully the essence survives as a short written distillation.
-- **Slop score** (0–100) — how likely the script/narration is low-effort, AI-content-farm output.
-- **Community check** — for high-view videos, the top ~20 comments are pulled and used to
-  cross-examine the scores (commenters reliably flag AI voices, re-uploads, and factual
-  errors). The card notes whether the community agrees.
-- **Key takeaways + "read it instead"** — expandable, so the card stays compact.
+---
 
-### Bring your own AI key
+## The verdict
 
-WTYT sends each transcript to an AI model you choose. Two providers are supported:
+**WATCH** — genuinely visual, worth the minutes. **READ** — informative but not visual, so a
+distillation is included and you reclaim the time. **LISTEN** — music, a song, a live set;
+watch/read scoring doesn't apply to something you're meant to hear, not parse, so it gets its
+own minimal card instead of forcing irrelevant bars onto it. **SKIP** — low value, redundant,
+or generic filler.
+
+Underneath, three independent 0–100 axes (watch, read, generic) feed the verdict, plus a
+gated **AI-generated badge** — the model only ever shows "high confidence" when multiple
+signals agree, because a wrong AI-generated label does more damage than a missed one. A
+**secondary tag** (e.g. a WATCH that's also strongly readable) is computed in code from the
+returned scores rather than asked of the model directly, so it can't drift or hallucinate
+across providers of very different capability — the small free models are trustworthy enough
+to score, not to self-report a second judgment on top.
+
+For high-view videos, the top ~20 comments are pulled and used as a **cross-check**: commenters
+reliably call out AI voices, re-uploads, and factual errors, and the card notes whether they
+agree with the score. This costs nothing extra to skip — the field is omitted entirely on
+low-view videos rather than sent empty, so a weaker model can't invent comment sentiment that
+was never given to it.
+
+## Read it, save it, come back to it
+
+Click the "~N min read" chip (or the verdict pill) and a reader overlay opens in place — full
+transcript, summary, key takeaways — without leaving the page or trusting a third-party
+"read it later" service with your data. Hit **Save** and it's kept locally, in a namespace
+deliberately separate from the analysis cache, so clearing the cache to force a rescore can
+never accidentally wipe something you saved. A dedicated notes page (thumbnail grid, tap to
+reopen) is reachable from any card.
+
+![A WTYT READ card: verdict, score bars, and a written "read it instead" distillation](assets/read-instead.png)
+
+![The WTYT saved-notes page: a thumbnail grid of saved videos, tap any card to reopen its reader view](assets/saved-notes.png)
+
+## Bring your own AI key — and keep it working
+
+WTYT sends each transcript to a model you choose, not one it ships baked in:
 
 | Provider | Cost | Default model | Notes |
 |----------|------|---------------|-------|
-| **Groq** | **Free tier** | GPT-OSS 120B | No credit card. OpenAI-compatible, native JSON mode. Best free judgment; Llama 3.1 8B is the fastest bulk option. Rate-limited per minute/day. |
-| **Claude (Anthropic)** | Paid API | Claude Haiku 4.5 | Sharpest judgment. Haiku ≈ $0.006/video; Sonnet 5 for a curated re-pass. |
+| **Groq** | **Free tier** | Llama 3.3 70B | No credit card. Free-tier daily limit hit? WTYT walks a fallback chain (70B → GPT-OSS 120B → Llama 3.1 8B) automatically, so scoring keeps going and the card just notes a backup model scored it. |
+| **Claude (Anthropic)** | Paid API | Claude Haiku 4.5 | Sharpest judgment when you want it. Haiku ≈ $0.006/video; Sonnet 5 for a curated re-pass. |
 
-Your key is stored in `chrome.storage.local` only and sent straight to the provider
-(`api.groq.com` or `api.anthropic.com`) from the extension's own service worker — there is
-no middle-man server.
+The two providers share **one prompt and one JSON contract** — only the HTTP shape differs —
+so adding a third provider is a small, mechanical addition, not a rewrite. Your key lives in
+`chrome.storage.local` and is sent straight to the provider from the extension's own service
+worker; the key never enters page context, and there's no middle-man server to trust or host.
 
-### Install (load unpacked)
+Free-tier models don't just rate-limit per minute, they cap out **per day** — a wall a simple
+retry-with-backoff can't wait out. That's the actual reason the fallback chain exists: it's
+not a nicety, it's what makes "free, no credit card" a viable default rather than a demo that
+breaks under real use.
 
-1. Clone or download this repo.
-2. `chrome://extensions` → enable **Developer mode**.
-3. **Load unpacked** → select the repo folder (the one with `manifest.json`).
-4. Onboarding opens → pick **Groq** (free) or **Claude**, paste your key, hit **Test**.
-   - Groq key: [console.groq.com/keys](https://console.groq.com/keys) — free, no card.
-   - Claude key: [platform.claude.com](https://platform.claude.com/settings/keys) — paid API, set a spend cap.
-5. Open your home feed, a video, or a playlist. Scoring starts on its own (playlists use the
-   **WTYT · Analyze playlist** button).
+## Built to survive a site it doesn't control
 
-### Settings
+YouTube ships DOM changes continuously — including a real regression where the playlist page
+flip-flopped between `yt-lockup-view-model` and the "retired" `ytd-playlist-video-renderer`
+mid-development. Rather than bet on one, the scanner detects and parses **both** at runtime.
+Transcripts fall back to the ANDROID InnerTube client when the web caption track comes back
+empty (a known 2025+ proof-of-origin quirk on the web path). Every injected node uses
+`createElement`/`textContent` (SVGs via `createElementNS`) because YouTube enforces Trusted
+Types and `innerHTML` from a content script throws outright. None of this is defensive
+paranoia — each one is a bug that happened first and got fixed second.
 
-| Setting | Default | Notes |
-|---------|---------|-------|
-| Provider / model | Groq · GPT-OSS 120B | Switch anytime; per-provider keys kept separately. |
-| Auto-analyze | On | Home + watch pages score automatically; off makes them wait for a button. |
-| Home batch size | 16 | Scores this many, then offers a "Continue" button. |
-| Max videos per playlist run | 25 | Playlist order, top down. |
-| Comment-check threshold | 100,000 views | At/above this, top comments are pulled as a cross-check. |
+Analyses are cached per `provider:model:videoId`, not just `videoId`, so switching providers
+mid-session always rescores instead of silently showing you the other provider's stale
+verdict — a correctness bug that's easy to miss in testing and obvious the moment a real user
+switches keys. Prompt caching was investigated and deliberately *not* used: the scoring
+rubric (~700 tokens) sits under Haiku 4.5's 4,096-token cacheable floor, so it would have
+silently no-op'd. Measuring first meant not shipping a no-op optimization.
 
 ---
 
-## For builders: how it works
+## For builders
 
-Fork-friendly by design — vanilla JS, no build step, no framework, no bundler. Clone it, edit a file, reload the extension. Everything below is the reasoning behind the code, so you can extend it without reverse-engineering the decisions.
+Fork-friendly on purpose — vanilla JS, no build step, no framework, no bundler. Clone it, edit
+a file, reload the extension.
 
 ### Architecture
 
@@ -77,20 +109,22 @@ Fork-friendly by design — vanilla JS, no build step, no framework, no bundler.
 any YouTube surface (home / watch / playlist)
   content script (content.js) routes by URL and scans video rows ─▶ per video:
     yt-data.js  fetch watch page (same-origin, your cookies) ─▶ transcript
-                  · web caption track first
-                  · ANDROID-client InnerTube player as fallback (no proof-of-origin token)
+                  · web caption track first, ANDROID InnerTube client as fallback
                 high-view video? ─▶ top comments via /youtubei/v1/next continuation
-    background.js (service worker) ─▶ Groq or Anthropic (your key) ─▶ JSON scores
+    background.js (service worker) ─▶ Groq or Anthropic (your key) ─▶ JSON scores,
+                  walking the free-tier fallback chain on a daily rate limit
     cards.js    inject the report card into the row (createElement only)
+    reader.js / notes-store.js   full-transcript reader overlay + local saved notes
 ```
 
 | File | Responsibility |
 |------|----------------|
-| `src/content.js` | Surface router (home / watch / playlist) + orchestration; owns the scan → score → render loop and the injection lifecycle. |
-| `src/yt-data.js` | The scraping layer — DOM parsing for every surface, transcript retrieval, and the comments fetch. All same-origin. |
-| `src/background.js` | The only place the API key is used. Provider routing, the scoring prompt, JSON parsing, and the deterministic guards. |
-| `src/cards.js` | All rendering — the three card variants, built with `createElement` (never `innerHTML`). |
-| `src/models.js` | Single source of truth for the provider/model catalog, costs, and copy — so settings and onboarding never drift. |
+| `src/content.js` | Surface router (home / watch / playlist) + orchestration; the scan → score → render loop. |
+| `src/yt-data.js` | The scraping layer — dual-markup DOM parsing, transcript retrieval, comments fetch. |
+| `src/background.js` | The only place the API key is used — provider routing, the scoring prompt, the deterministic guards, the fallback chain. |
+| `src/cards.js` | All rendering — three card variants, `createElement` only. |
+| `src/reader.js` / `src/notes-store.js` | Reader overlay + local saved-notes store. |
+| `src/models.js` | Single source of truth for the provider/model catalog — settings and onboarding read from it, so they can't drift apart. |
 | `src/options.*`, `src/welcome.*` | Settings page and onboarding wizard. |
 
 ### Engineering decisions
@@ -105,15 +139,18 @@ The non-obvious calls, and why they were made that way:
 
 - **Provider abstraction, not provider lock-in.** Claude and Groq share one prompt and one
   JSON contract; only the HTTP shape differs. Routing keys off the model id (`claude*` →
-  Anthropic, else Groq) so a stale saved provider can't wedge the extension. Groq is the
-  default because its free tier plus native JSON mode make it the only genuinely no-paid-key
-  path.
+  Anthropic, else Groq) so a stale saved provider can't wedge the extension.
 
-- **Deterministic guards over trusting the model.** Two correctness rules are enforced in
-  code, not in the prompt: `read_instead` is forced empty unless the verdict is `read`, and
-  `community_check` is dropped whenever no comments were sent. This makes the output robust to
-  weaker open models that would otherwise fabricate comment sentiment or leak a distillation
-  onto a SKIP.
+- **The free tier survives its own limits.** Groq's free models each cap out at a certain
+  number of tokens *per day*, not just per minute — a hard wall a simple retry can't wait out.
+  `background.js` walks a fallback chain (70B → 120B → 8B) so a daily cap on one model doesn't
+  stop scoring; it just quietly stacks the free budgets and notes the swap on the card.
+
+- **Deterministic guards over trusting the model.** Several correctness rules are enforced in
+  code, not the prompt: `read_instead` is forced empty unless the verdict is `read`,
+  `community_check` is dropped whenever no comments were sent, and the secondary tag is
+  computed from the returned scores rather than asked of the model — so it can't drift across
+  providers of very different capability.
 
 - **Dual-markup DOM resilience.** YouTube ships DOM changes continuously and has flip-flopped
   the playlist page between `yt-lockup-view-model` and `ytd-playlist-video-renderer` more than
@@ -127,6 +164,10 @@ The non-obvious calls, and why they were made that way:
 - **Trusted Types compliance.** YouTube enforces Trusted Types, so any `innerHTML` from a
   content script throws. Every injected node is built with `createElement` / `textContent` and
   SVGs via `createElementNS`.
+
+- **Cache correctness over cache size.** Analyses are cached per `provider:model:videoId`, not
+  just `videoId` — so switching providers or models always rescores instead of silently
+  showing you the other provider's stale verdict.
 
 - **Measured, not assumed.** Prompt caching was investigated and *rejected*: the scoring rubric
   (~700 tokens) sits under Haiku 4.5's 4,096-token cacheable floor, so caching would silently
