@@ -39,6 +39,12 @@ const WTYT_ICONS = (() => {
       ['rect', { x: 17, y: 13, width: 4, height: 7, rx: 1.5 }],
     ],
     ai: [['path', { d: 'M12 3.5 13.7 10.3 20.5 12 13.7 13.7 12 20.5 10.3 13.7 3.5 12 10.3 10.3z' }]],
+    // live=broadcast dot with waves (0.7.0 LIVE marker; UPCOMING reuses the clock).
+    live: [
+      ['circle', { cx: 12, cy: 12, r: 3, fill: 'currentColor', stroke: 'none' }],
+      ['path', { d: 'M6.3 6.3a8 8 0 0 0 0 11.4' }],
+      ['path', { d: 'M17.7 6.3a8 8 0 0 1 0 11.4' }],
+    ],
     // lifecycle-state icons (0.4.1): queued=clock, scoring=spinner (CSS-spun), failed retry=rotate-cw.
     clock: [['circle', { cx: 12, cy: 12, r: 9 }], ['polyline', { points: '12 7 12 12 15 14' }]],
     spinner: [['path', { d: 'M21 12a9 9 0 1 1-9-9' }]],

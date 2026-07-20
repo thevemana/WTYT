@@ -48,6 +48,42 @@ const WTYT_CARDS = (() => {
     return pill;
   }
 
+  // ---- live / upcoming markers (0.7.0) -----------------------------------------
+  // Live streams and un-aired premieres have no finished transcript, so we never score them —
+  // we mark them and move on (no API call). Reuses the verdict-pill shape with its own colors.
+  const MARKERS = {
+    live: { label: 'LIVE', cls: 'wtyt-verdict-live', icon: 'live', note: 'Live now — nothing to score until it ends.' },
+    upcoming: { label: 'UPCOMING', cls: 'wtyt-verdict-upcoming', icon: 'clock', note: 'Hasn’t aired yet — nothing to score.' },
+  };
+  function markerPill(kind) {
+    const m = MARKERS[kind] || MARKERS.live;
+    const pill = el('span', 'wtyt-verdict ' + m.cls);
+    pill.append(icon(m.icon, 15), el('span', 'wtyt-verdict-label', m.label));
+    return pill;
+  }
+  // Small card for playlist / search / watch: just the marker + a one-line reason.
+  function renderMarker(kind) {
+    const m = MARKERS[kind] || MARKERS.live;
+    const card = el('div', 'wtyt-card wtyt-card-minimal wtyt-marker-card');
+    const head = el('div', 'wtyt-head');
+    head.append(markerPill(kind));
+    card.append(head);
+    card.append(el('p', 'wtyt-oneliner', m.note));
+    return card;
+  }
+  // Home tile: pin the marker in the same thumbnail slot the verdict pill would take.
+  function markHomeMarker(lockup, kind) {
+    if (!lockup) return;
+    const imageHost = lockup.querySelector('.ytLockupViewModelContentImage, ytd-thumbnail, #thumbnail')
+      || lockup.querySelector('a[href*="watch?v="]');
+    if (!imageHost) return;
+    imageHost.classList.add('wtyt-image-host');
+    imageHost.querySelectorAll(':scope > .wtyt-pill-overlay').forEach((n) => n.remove());
+    const pill = markerPill(kind);
+    pill.classList.add('wtyt-pill-overlay');
+    imageHost.append(pill);
+  }
+
   function secondaryTag(analysis) {
     const label = SECONDARY[analysis.secondary_tag];
     return label ? el('span', 'wtyt-secondary', '(' + label + ')') : null;
@@ -134,7 +170,7 @@ const WTYT_CARDS = (() => {
       const chip = el('button', 'wtyt-tool wtyt-readtime');
       chip.type = 'button';
       chip.append(icon('read', 14), el('span', null, `~${readMinutes(analysis.transcript_text)} min read`));
-      chip.addEventListener('click', (e) => { e.stopPropagation(); WTYT_READER.openOverlay(note); });
+      chip.addEventListener('click', (e) => { e.stopPropagation(); WTYT_METRICS.bump('button', { name: 'readtime' }); WTYT_READER.openOverlay(note); });
       tools.append(chip);
     }
 
@@ -153,6 +189,8 @@ const WTYT_CARDS = (() => {
     save.addEventListener('click', (e) => {
       e.stopPropagation();
       const next = !saved;
+      WTYT_METRICS.bump('button', { name: 'save' });
+      if (next) WTYT_METRICS.bump('noteSaved');
       (next ? WTYT_NOTES.save(note) : WTYT_NOTES.remove(note.id)).then(() =>
         window.dispatchEvent(new CustomEvent('wtyt-note-changed', { detail: { id: note.id, saved: next } }))
       );
@@ -163,7 +201,7 @@ const WTYT_CARDS = (() => {
     const notesLink = el('button', 'wtyt-tool wtyt-noteslink', 'Notes ↗');
     notesLink.type = 'button';
     notesLink.title = 'Open your saved notes';
-    notesLink.addEventListener('click', (e) => { e.stopPropagation(); chrome.runtime.sendMessage({ type: 'openNotes' }); });
+    notesLink.addEventListener('click', (e) => { e.stopPropagation(); WTYT_METRICS.bump('button', { name: 'notesLink' }); chrome.runtime.sendMessage({ type: 'openNotes' }); });
     tools.append(notesLink);
     return tools;
   }
@@ -180,7 +218,7 @@ const WTYT_CARDS = (() => {
     // The verdict pill opens the reader too (same as the read-time chip) when there's content.
     if (opts.tools && opts.video && analysis.transcript_text) {
       pill.classList.add('wtyt-clickable');
-      pill.addEventListener('click', (e) => { e.stopPropagation(); WTYT_READER.openOverlay(buildNote(analysis, opts.video)); });
+      pill.addEventListener('click', (e) => { e.stopPropagation(); WTYT_METRICS.bump('button', { name: 'verdictOpen' }); WTYT_READER.openOverlay(buildNote(analysis, opts.video)); });
     }
     head.append(pill);
     if (opts.tools && opts.video) head.append(toolbar(analysis, opts.video));
@@ -296,6 +334,14 @@ const WTYT_CARDS = (() => {
     return card;
   }
 
+  // Drop just the pending/scoring skeleton from a row (leaves a real result card alone) —
+  // used when a queued row is abandoned on a Manual flip so it doesn't sit frozen (item-4).
+  function detachPending(row) {
+    if (!row) return;
+    const host = row.querySelector('#meta') || row.querySelector('.ytLockupViewModelMetadata') || row;
+    host.querySelectorAll(':scope > .wtyt-card.wtyt-pending').forEach((n) => n.remove());
+  }
+
   // Watch: expansive panel, details + transcript open, injected atop the up-next rail.
   function renderWatch(analysis, opts = {}) {
     const card = render(analysis, { open: true, ...opts });
@@ -365,6 +411,15 @@ const WTYT_CARDS = (() => {
     imageHost.append(stateOverlay(name, opts));
   }
 
+  // Drop just the lifecycle-state overlay from a home tile (leaves a scored verdict pill alone) —
+  // the home counterpart of detachPending, for a queued tile abandoned on a Manual flip (item-4).
+  function clearHomeState(lockup) {
+    if (!lockup) return;
+    const imageHost = lockup.querySelector('.ytLockupViewModelContentImage, ytd-thumbnail, #thumbnail')
+      || lockup.querySelector('a[href*="watch?v="]');
+    imageHost?.querySelectorAll(':scope > .wtyt-pill-overlay.wtyt-state').forEach((n) => n.remove());
+  }
+
   // Direct child of `container` that contains (or is) `node` — used to anchor the score
   // row immediately above the title's own top-level wrapper, regardless of how deep the
   // title text node sits inside YouTube's metadata markup.
@@ -402,5 +457,8 @@ const WTYT_CARDS = (() => {
     }
   }
 
-  return { render, renderPending, renderError, attach, renderWatch, attachWatch, attachHome, markHome };
+  return {
+    render, renderPending, renderError, attach, detachPending, renderWatch, attachWatch,
+    attachHome, markHome, clearHomeState, renderMarker, markHomeMarker,
+  };
 })();

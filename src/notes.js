@@ -56,7 +56,9 @@ function noteCard(note) {
   body.append(meta);
   card.append(body);
 
-  card.addEventListener('click', () => WTYT_READER.openOverlay(note));
+  // savedNoteRead is the "did they come back and read it" signal — distinct from the general
+  // summaryRead that openOverlay fires (which also counts first-time reads off a card).
+  card.addEventListener('click', () => { WTYT_METRICS.bump('savedNoteRead'); WTYT_READER.openOverlay(note); });
   return card;
 }
 

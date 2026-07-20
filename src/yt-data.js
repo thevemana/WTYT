@@ -70,6 +70,27 @@ const WTYT_DATA = (() => {
     return (text || '').split('\n').map((s) => s.trim()).filter(Boolean)[0] || '';
   }
 
+  // Detect a live / upcoming (premiere) row so the engine can mark it and SKIP scoring — a live
+  // stream has no finished transcript and an upcoming video hasn't aired, so scoring either just
+  // burns an API call for garbage (0.7.0). Any one signal is decisive:
+  //  - metadata text: live shows "N watching" (concurrent viewers) instead of "views"; upcoming
+  //    shows "Scheduled"/"Premieres in…"/"Waiting" (an ALREADY-aired "Premiered 2 days ago" says
+  //    "premiered", not "premieres", so it is correctly NOT matched).
+  //  - a thumbnail time-status overlay whose overlay-style is LIVE / UPCOMING.
+  //  - a badge reading LIVE / UPCOMING / SCHEDULED / WAITING.
+  // Verified live 2026-07-18: search live rows (Lofi Girl etc.) carry "N watching" and no views.
+  function detectLiveState(rowEl, metaText) {
+    const text = (metaText || []).join(' ').toLowerCase();
+    const overlay = (rowEl.querySelector('[overlay-style]')?.getAttribute('overlay-style') || '').toUpperCase();
+    const badges = [...rowEl.querySelectorAll(
+      '.badge-shape-wiz__text, ytd-thumbnail-overlay-time-status-renderer #text, .ytThumbnailOverlayBadgeViewModelHost'
+    )].map((b) => (b.textContent || '').trim().toUpperCase()).join(' ');
+    const signal = badges + ' ' + overlay;
+    if (/\bLIVE\b/.test(signal) || /\bwatching\b/.test(text)) return 'live';
+    if (/UPCOMING|SCHEDULED|WAITING/.test(signal) || /scheduled|premieres|waiting for/.test(text)) return 'upcoming';
+    return null;
+  }
+
   function parseLockup(lockup) {
     const link = lockup.querySelector('a[href*="watch?v="]');
     if (!link) return null;
@@ -87,6 +108,7 @@ const WTYT_DATA = (() => {
       duration: (lockup.querySelector('.ytBadgeShapeText, .badge-shape-wiz__text')?.textContent || '').trim(),
       viewsText,
       views: parseViews(viewsText),
+      liveState: detectLiveState(lockup, metaText),
     };
   }
 
@@ -112,6 +134,7 @@ const WTYT_DATA = (() => {
       ),
       viewsText,
       views: parseViews(viewsText),
+      liveState: detectLiveState(row, metaText),
     };
   }
 
@@ -133,7 +156,12 @@ const WTYT_DATA = (() => {
   // produced a "5/25" counter on a 15-video list). Support both markups: prefer the
   // legacy playlist rows when present (current live shape), else the lockup shape.
   function scanPlaylist() {
-    const root = document.querySelector('ytd-two-column-browse-results-renderer #primary') ||
+    // Prefer the playlist's own video-list container — on the SPA-nav layout the 14 rows render
+    // in ytd-playlist-video-list-renderer, which sits OUTSIDE #primary (a fresh load puts them
+    // back inside, which is why "refresh fixes it"). The list renderer only holds the playlist's
+    // videos, so scoping to it also avoids the secondary-column over-count #primary guarded against.
+    const root = document.querySelector('ytd-playlist-video-list-renderer') ||
+      document.querySelector('ytd-two-column-browse-results-renderer #primary') ||
       document.querySelector('#primary') || document;
     const legacy = root.querySelectorAll('ytd-playlist-video-renderer');
     if (legacy.length) return scanRows(legacy, parsePlaylistRow);
@@ -153,6 +181,22 @@ const WTYT_DATA = (() => {
     return scanRows(nodes, parseLockup);
   }
 
+  // ---------- search results (/results) ----------
+  // The real results are ytd-video-renderer (verified live 2026-07-18: 13-20 of them, the actual
+  // matches). The yt-lockup-view-model elements on a search page are the SECONDARY shelves —
+  // "people also watched", mixes, unrelated suggestions — so we deliberately scan only the video
+  // renderers within the search primary column and ignore lockups here, which keeps the noise
+  // shelves out. Selectors on ytd-video-renderer match the legacy playlist row exactly, so we
+  // reuse parsePlaylistRow. Channel / playlist / Shorts-shelf renderers aren't ytd-video-renderer,
+  // so they're skipped for free.
+  function searchRoot() {
+    return document.querySelector('ytd-two-column-search-results-renderer') ||
+      document.querySelector('#primary') || document;
+  }
+  function scanSearch() {
+    return scanRows(searchRoot().querySelectorAll('ytd-video-renderer'), parsePlaylistRow);
+  }
+
   // ---------- watch page (current video) ----------
   function scanWatch() {
     const id = new URLSearchParams(location.search).get('v');
@@ -166,6 +210,19 @@ const WTYT_DATA = (() => {
       viewsText: (document.querySelector('#info-container span, .view-count, #info span')?.textContent || '').trim(),
       views: null,
     };
+  }
+
+  // Live/upcoming from the fetched player response — the reliable watch-page signal, and a
+  // backstop for any feed row whose DOM live-badge we missed (caught before the LLM call).
+  // isLive is true only while actively streaming; isUpcoming / LIVE_STREAM_OFFLINE = a premiere
+  // or stream not yet aired. A finished live VOD has neither (isLiveContent alone), so it stays
+  // scoreable — it has a real transcript.
+  function watchLiveState(watch) {
+    const d = (watch && watch.player && watch.player.videoDetails) || {};
+    const status = (watch && watch.player && watch.player.playabilityStatus && watch.player.playabilityStatus.status) || '';
+    if (d.isUpcoming || status === 'LIVE_STREAM_OFFLINE') return 'upcoming';
+    if (d.isLive) return 'live';
+    return null;
   }
 
   // Inject at the very top of the right column so the card sits ABOVE the playlist box
@@ -322,7 +379,8 @@ const WTYT_DATA = (() => {
   }
 
   return {
-    scanPlaylist, scanFeed, scanWatch, watchRail, parseLockup, parsePlaylistRow,
+    scanPlaylist, scanFeed, scanSearch, scanWatch, watchRail, parseLockup, parsePlaylistRow,
+    detectLiveState, watchLiveState,
     fetchWatchPage, getTranscript, getTopComments, parseViews, extractJson, deepFind,
   };
 })();

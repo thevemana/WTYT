@@ -1,0 +1,40 @@
+name: 💡 Feature request
+description: Suggest an idea or improvement for WTYT
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Tell us the **problem** first — it helps us find the best solution, which might differ from what you'd expect.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or goal — what's hard or annoying today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like WTYT to do?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where would this apply?
+      options:
+        - Home feed
+        - Search results
+        - Playlist
+        - Watch page
+        - Saved notes / reader
+        - Settings / onboarding
+        - Something new
+        - Not sure
+  - type: textarea
+    id: context
+    attributes:
+      label: How often would this help, and what do you do today instead?

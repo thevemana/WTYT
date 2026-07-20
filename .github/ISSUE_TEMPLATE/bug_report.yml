@@ -1,0 +1,74 @@
+name: 🐞 Bug report
+description: Something in WTYT isn't working right
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve WTYT — even a partial report is useful.
+
+        ⚠️ **Don't paste your API key.** WTYT sends your key only to Anthropic/Groq. If you attach console output or a screenshot, redact anything that looks like a key (`sk-…`, `gsk_…`).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      options:
+        - Home feed
+        - Search results
+        - Playlist
+        - Watch page
+        - Settings
+        - Onboarding
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Which AI provider were you using?
+      options:
+        - Groq (free)
+        - Claude (paid)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Which model? (if you know)
+      placeholder: e.g. Llama 3.3 70B, GPT-OSS 120B, Claude Haiku 4.5
+  - type: input
+    id: version
+    attributes:
+      label: WTYT version
+      description: Find it in chrome://extensions.
+      value: "0.7.2"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & OS
+      placeholder: e.g. Chrome 141 on Windows 11
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors (optional)
+      description: "chrome://extensions → WTYT → “service worker”, or the page console. Redact any keys first."
+      render: shell

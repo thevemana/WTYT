@@ -55,6 +55,9 @@ html[dark] .wtyt-card {
 .wtyt-verdict-read { background: #3170c7; }
 .wtyt-verdict-listen { background: #7c4dff; }
 .wtyt-verdict-skip { background: #7d7d7d; }
+/* live/upcoming markers (0.7.0): red = happening now, amber = not aired yet. */
+.wtyt-verdict-live { background: #cc0000; }
+.wtyt-verdict-upcoming { background: #d9822b; }
 
 .wtyt-oneliner { display: block; margin: 5px 0 0; color: var(--wtyt-text); }
 

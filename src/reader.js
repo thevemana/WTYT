@@ -85,6 +85,8 @@ const WTYT_READER = (() => {
     window.addEventListener('wtyt-note-changed', (e) => { if (e.detail && e.detail.id === note.id) reflect(e.detail.saved); });
     btn.addEventListener('click', () => {
       const next = !saved;
+      WTYT_METRICS.bump('button', { name: 'save' });
+      if (next) WTYT_METRICS.bump('noteSaved');
       (next ? WTYT_NOTES.save(note) : WTYT_NOTES.remove(note.id)).then(() =>
         window.dispatchEvent(new CustomEvent('wtyt-note-changed', { detail: { id: note.id, saved: next } }))
       );
@@ -140,6 +142,7 @@ const WTYT_READER = (() => {
   }
 
   function openOverlay(note) {
+    WTYT_METRICS.bump('summaryRead');
     injectStyle();
     document.querySelectorAll('.wtyt-reader-overlay').forEach((n) => n.remove());
     const overlay = el('div', 'wtyt-reader-overlay');

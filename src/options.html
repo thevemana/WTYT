@@ -143,10 +143,20 @@
       color: var(--wtyt-ink);
     }
     .notes-cta-body .hint { margin: 0 0 12px; }
+
+    .metrics-readout { margin-top: 16px; font-size: 13px; }
+    .metrics-readout .mrow {
+      display: flex; justify-content: space-between; gap: 12px;
+      padding: 6px 0; border-bottom: 1px solid var(--wtyt-border);
+    }
+    .metrics-readout .mrow:last-child { border-bottom: none; }
+    .metrics-readout .mk { color: var(--wtyt-ink-2); }
+    .metrics-readout .mv { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+    .metrics-readout .mnote { color: var(--wtyt-ink-2); font-size: 12px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>WTYT · Watch The YouTube Things</h1>
+  <h1>WTYT</h1>
   <p class="sub">Adds a watch / read / listen / skip verdict to videos on your home feed, video pages, and playlists. Your key and settings stay in this browser.</p>
 
   <section class="notes-cta">
@@ -194,6 +204,7 @@
           <div style="margin-top:12px">
             <div class="model-cards" id="modelCards"></div>
             <div class="cost-note" id="costNote"></div>
+            <div class="cost-note" id="runwayNote" hidden></div>
           </div>
         </details>
       </div>
@@ -202,12 +213,14 @@
 
   <section>
     <details class="adv" open>
-      <summary>Automatic analysis</summary>
+      <summary>Auto / manual by surface</summary>
       <div style="margin-top:16px">
-        <label class="checkline"><input type="checkbox" id="autoScoreVideos" /> <span>Auto-score videos</span></label>
-        <div class="hint">On: video pages score as soon as you open them, and the home feed scores as you scroll (in batches). Off: nothing runs until you click the WTYT button.</div>
-        <label class="checkline" style="margin-top:14px"><input type="checkbox" id="autoScorePlaylists" /> <span>Auto-score playlists</span></label>
-        <div class="hint">On: a playlist scores automatically when you open it. Off: click "WTYT · Analyze playlist" to start it yourself.</div>
+        <div class="hint" style="margin-bottom:14px"><strong>Auto</strong> scores as you browse; <strong>Manual</strong> waits until you hit "Score this page" on the WTYT widget. Set it per surface — you can also flip the current page straight from the widget.</div>
+        <label class="checkline"><input type="checkbox" id="autoHome" /> <span>Home feed — auto</span></label>
+        <label class="checkline" style="margin-top:12px"><input type="checkbox" id="autoSearch" /> <span>Search results — auto</span></label>
+        <label class="checkline" style="margin-top:12px"><input type="checkbox" id="autoPlaylist" /> <span>Playlists — auto</span></label>
+        <label class="checkline" style="margin-top:12px"><input type="checkbox" id="autoWatch" /> <span>Video pages — auto</span></label>
+        <div class="hint" style="margin-top:14px">On the free Groq tier, scoring is paced to a few videos per minute to stay under the rate limit — a busy feed fills in gradually. A Claude key or Groq's paid tier removes the cap.</div>
       </div>
     </details>
   </section>
@@ -215,11 +228,6 @@
   <section>
     <details class="adv">
       <summary>Advanced settings</summary>
-      <div style="margin-top:16px">
-        <label class="field-label" for="homeBatch">Home-feed batch size</label>
-        <input type="number" id="homeBatch" min="1" max="100" style="max-width:160px" />
-        <div class="hint">Videos auto-scored per batch on the home feed before the Continue button appears. Cached videos are free and do not count.</div>
-      </div>
       <div class="row2" style="margin-top:16px">
         <div>
           <label class="field-label" for="maxVideos">Max videos per run</label>
@@ -235,6 +243,23 @@
     </details>
   </section>
 
+  <section>
+    <details class="adv" open>
+      <summary>Your WTYT activity &amp; privacy</summary>
+      <div style="margin-top:16px">
+        <label class="checkline"><input type="checkbox" id="metricsEnabled" /> <span>Share anonymous usage counts</span></label>
+        <div class="hint">Counts only — sessions, pages visited, videos triaged, tokens used, notes saved, buttons tapped. <strong>Never</strong> video titles, URLs, or any content. Everything stays in this browser until you choose to email it. On by default while WTYT is in testing.</div>
+        <div id="metricsReadout" class="metrics-readout"></div>
+        <div class="actions" style="margin-top:14px">
+          <button id="exportMetrics" class="btn-primary" type="button">Email my report</button>
+          <button id="copyMetrics" class="btn-ghost" type="button">Copy full JSON</button>
+          <button id="resetMetrics" class="btn-ghost" type="button">Reset my stats</button>
+        </div>
+        <p class="hint" style="margin-top:12px">Have an idea or found a bug? <a href="https://github.com/thevemana/WTYT/issues" target="_blank" rel="noopener">Request a feature or report a bug ↗</a></p>
+      </div>
+    </details>
+  </section>
+
   <div class="actions">
     <button id="reset" class="btn-ghost" type="button">Reset to defaults</button>
     <button id="clearCache" class="btn-ghost" type="button">Clear cached analyses</button>
@@ -242,6 +267,7 @@
   </div>
   <p class="hint" style="margin-top:6px">Changes save automatically. Reset restores the default settings (your API keys are kept).</p>
 
+  <script src="metrics.js"></script>
   <script src="models.js"></script>
   <script src="options.js"></script>
 </body>
