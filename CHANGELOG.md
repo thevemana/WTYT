@@ -4,8 +4,6 @@ Newest first. WTYT ships as a single extension; each version below is a
 milestone in what it can do. Bring your own key — Claude (paid) or Groq (free).
 
 ## 0.7.2 — 2026-07-19
-- **Shorter name.** The extension is now just **WTYT** — in Chrome, in
-  settings, and on the welcome screen.
 - Onboarding now mentions that **search results** are scored too, alongside
   your home feed and playlists.
 
